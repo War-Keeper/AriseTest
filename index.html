@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gem Catalog • Static + Google Sheet Filters</title>
+  <!-- Tailwind (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Icons -->
+  <script src="https://unpkg.com/feather-icons"></script>
+  <!-- PapaParse for CSV parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+    /* Scrollbar polish */
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+
+    /* Gradient skeleton shimmer */
+    .skeleton {
+      position: relative;
+      overflow: hidden;
+      background-color: #e5e7eb;
+    }
+    .skeleton::after {
+      position: absolute; inset: 0; content: "";
+      background: linear-gradient(90deg, rgba(229,231,235,0), rgba(229,231,235,.8), rgba(229,231,235,0));
+      animation: shimmer 1.3s infinite;
+      transform: translateX(-100%);
+    }
+    @keyframes shimmer { 100% { transform: translateX(100%); } }
+
+    /* Color swatch circle with ring */
+    .swatch { width: 16px; height: 16px; border-radius: 9999px; box-shadow: inset 0 0 0 2px rgba(255,255,255,.7); }
+
+    /* Facet pill styles */
+    .pill { @apply inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs border border-gray-300 bg-white; }
+
+    /* Card hover */
+    .card:hover { box-shadow: 0 8px 24px rgba(17,24,39, .08); transform: translateY(-2px); }
+    .card { transition: all .2s ease; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <header class="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-indigo-600"></div>
+        <div>
+          <h1 class="text-lg font-semibold">Gem Catalog</h1>
+          <p class="text-xs text-gray-500">Static site • Google Sheet powered</p>
+        </div>
+      </div>
+
+      <div class="ml-auto flex-1 max-w-2xl">
+        <label class="sr-only" for="q">Search</label>
+        <div class="relative">
+          <input id="q" type="search" placeholder="Search stock ID, shape, origin, etc…" class="w-full rounded-xl border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 pl-10" />
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+            <i data-feather="search"></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="refreshBtn" class="rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50 hidden sm:inline-flex items-center gap-2"><i data-feather="refresh-ccw" class="w-4 h-4"></i> Refresh</button>
+        <a href="#" id="csvLink" class="rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50 inline-flex items-center gap-2"><i data-feather="link" class="w-4 h-4"></i> Data</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <!-- Sidebar Filters -->
+    <aside class="lg:col-span-3">
+      <div class="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 sticky top-24">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-sm font-semibold">Filters</h2>
+          <button id="clearAll" class="text-xs text-indigo-600 hover:underline">Clear all</button>
+        </div>
+
+        <div id="activePills" class="flex flex-wrap gap-2 mb-3"></div>
+
+        <div class="space-y-4" id="facets">
+          <!-- Facets injected here -->
+        </div>
+      </div>
+    </aside>
+
+    <!-- Results -->
+    <section class="lg:col-span-9">
+      <div class="bg-white rounded-2xl border border-gray-200 p-3 sm:p-4">
+        <!-- Top toolbar like GemsNY -->
+        <div id="toolbar" class="mb-4 space-y-4">
+          <!-- Gem Type row -->
+          <div>
+            <div class="text-[12px] font-medium mb-2">Gem Type</div>
+            <div id="chipStones" class="flex flex-wrap gap-2"></div>
+          </div>
+          <!-- Shape row -->
+          <div>
+            <div class="text-[12px] font-medium mb-2">Shape</div>
+            <div id="chipShapes" class="flex flex-wrap gap-2"></div>
+          </div>
+          <!-- Sliders -->
+          <div class="grid md:grid-cols-3 gap-4">
+            <div>
+              <div class="text-[12px] font-medium">Price (USD)</div>
+              <div class="flex items-center gap-2 mt-2">
+                <input id="priceMin" type="number" class="w-28 rounded border-gray-300 text-sm" placeholder="$ Min">
+                <input id="priceMax" type="number" class="w-32 rounded border-gray-300 text-sm" placeholder="$ Max">
+              </div>
+            </div>
+            <div>
+              <div class="text-[12px] font-medium">Carat</div>
+              <div class="flex items-center gap-2 mt-2">
+                <input id="caratMin" type="number" step="0.01" class="w-24 rounded border-gray-300 text-sm" placeholder="Min">
+                <input id="caratMax" type="number" step="0.01" class="w-24 rounded border-gray-300 text-sm" placeholder="Max">
+              </div>
+            </div>
+            <div>
+              <div class="text-[12px] font-medium">Quality Grade</div>
+              <div class="flex items-center gap-2 mt-2">
+                <select id="qualityMin" class="rounded border-gray-300 text-sm">
+                  <option value="1">A</option>
+                  <option value="2">AA</option>
+                  <option value="3">AAA</option>
+                  <option value="4">AAAA</option>
+                  <option value="5">AAAAA</option>
+                </select>
+                <span class="text-gray-400">to</span>
+                <select id="qualityMax" class="rounded border-gray-300 text-sm">
+                  <option value="1">A</option>
+                  <option value="2">AA</option>
+                  <option value="3" selected>AAA</option>
+                  <option value="4">AAAA</option>
+                  <option value="5">AAAAA</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <!-- Dropdowns -->
+          <div class="grid md:grid-cols-5 gap-2">
+            <select id="selOrigin" class="rounded border-gray-300 text-sm"><option value="">Origin</option></select>
+            <select id="selPair" class="rounded border-gray-300 text-sm"><option value="">Single/Pair</option><option>Single</option><option>Pair</option></select>
+            <select id="selClarity" class="rounded border-gray-300 text-sm"><option value="">Clarity</option></select>
+            <select id="selTreatment" class="rounded border-gray-300 text-sm"><option value="">Enhancement</option></select>
+            <select id="selCert" class="rounded border-gray-300 text-sm"><option value="">Certificate</option></select>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-3 mb-3">
+          <div class="text-sm text-gray-500"><span id="resultCount">0</span> results</div>
+          <div class="ml-auto flex items-center gap-2">
+            <label class="text-xs text-gray-500" for="sort">Sort</label>
+            <select id="sort" class="rounded-lg border-gray-300 text-sm">
+              <option value="featured">Featured</option>
+              <option value="priceAsc">Price/Ct ↑</option>
+              <option value="priceDesc">Price/Ct ↓</option>
+              <option value="caratAsc">Carat ↑</option>
+              <option value="caratDesc">Carat ↓</option>
+              <option value="newest">Newest</option>
+            </select>
+            <label class="text-xs text-gray-500" for="perPage">Per page</label>
+            <select id="perPage" class="rounded-lg border-gray-300 text-sm">
+              <option>24</option>
+              <option>48</option>
+              <option>96</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="grid" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+          <!-- Cards inserted here -->
+        </div>
+
+        <div class="flex items-center justify-center gap-2 mt-4">
+          <button id="prevPage" class="px-3 py-2 text-sm rounded-lg border border-gray-300 disabled:opacity-50">Prev</button>
+          <div class="text-sm text-gray-500">Page <span id="page">1</span> / <span id="pages">1</span></div>
+          <button id="nextPage" class="px-3 py-2 text-sm rounded-lg border border-gray-300 disabled:opacity-50">Next</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <template id="cardTpl">
+    <article class="card group bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div class="aspect-square bg-gray-100 relative">
+        <img class="w-full h-full object-cover" alt="Gem image" />
+        <div class="absolute top-2 right-2 flex gap-1">
+          <span class="px-1.5 py-0.5 text-[10px] rounded-full bg-white/90 border border-gray-200" data-badge="stone"></span>
+          <span class="px-1.5 py-0.5 text-[10px] rounded-full bg-white/90 border border-gray-200 flex items-center gap-1" data-badge="color"><span class="swatch"></span><span data-badge-label></span></span>
+        </div>
+      </div>
+      <div class="p-3 space-y-1">
+        <div class="flex items-start justify-between gap-2">
+          <h3 class="font-medium text-sm leading-tight">
+            <a class="hover:underline" target="_blank" data-stock></a>
+          </h3>
+          <div class="text-right text-sm">
+            <div class="font-semibold" data-retail></div>
+            <div class="text-[11px] text-gray-500" data-carat></div>
+          </div>
+        </div>
+        <div class="text-xs text-gray-600 flex flex-wrap gap-x-3 gap-y-1">
+          <div><span class="text-gray-400">Shape:</span> <span data-shape></span></div>
+          <div><span class="text-gray-400">Clarity:</span> <span data-clarity></span></div>
+          <div><span class="text-gray-400">Origin:</span> <span data-origin></span></div>
+        </div>
+        <div class="text-[11px] text-gray-500">
+          <span data-size></span>
+        </div>
+      </div>
+    </article>
+  </template>
+
+  <template id="skeletonTpl">
+    <div class="card bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div class="aspect-square skeleton"></div>
+      <div class="p-3 space-y-2">
+        <div class="h-4 rounded skeleton"></div>
+        <div class="h-3 w-2/3 rounded skeleton"></div>
+        <div class="h-3 w-1/2 rounded skeleton"></div>
+      </div>
+    </div>
+  </template>
+
+  <script>
+    // ========= CONFIG =========
+    // 1) Publish your Google Sheet to the web as CSV and paste the URL below.
+    //    File → Share → Publish to web → Link → Entire Sheet → CSV
+    //    Or use: https://docs.google.com/spreadsheets/d/<SHEET_ID>/gviz/tq?tqx=out:csv
+    // Supports one or multiple Google Sheet tabs (CSV publish links). Each entry should be a published CSV URL.
+    // Add more entries for additional tabs (use each tab's gid).
+    const SHEET_SOURCES = [
+      { name: "Sheet 1", url: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrskicOCBNl6ntgcdNHGwTRaTQLrhMYsjHoYwiPAPyc72-awi5MQ9Rl5-jccvqI34RCNvDqJw2dz-T/pub?gid=0&single=true&output=csv" }
+      // Example: { name: "Rubies", url: "https://docs.google.com/.../pub?gid=123456789&output=csv" }
+    ];
+    const ALWAYS_FRESH = true; // cache-bust CSV fetches on each load
+
+    // 2) Column name mapping (case/space-insensitive). Add aliases as needed.
+    const COLS = {
+      originalId: ["Original Stock ID", "Original ID", "Orig ID", "Item No."],
+      stockId: ["Stock ID", "SKU", "ID", "Stock", "Product Number"],
+      stone: ["Stone", "Gem", "Gemstone", "Species", "Variety", "Gemstone Type"],
+      origin: ["Origin", "Country of Origin", "Origin/Country", "Gemstone Origin"],
+      shade: ["Shade", "Tone", "Gemstone Color Intensity"],
+      color: ["Color", "Colour", "Hue", "Body Color"],
+      clarity: ["Clarity", "Clarity Grade", "Gemstone Clarity"],
+      shape: ["Shape", "Cut", "Shape/Cut", "Gemstone Shape"],
+      sizeMm: ["Size (MM)", "Size", "Measurements (mm)", "Dimensions", "Dims (mm)", "LxWxH (mm)", "Length (mm)", "Width (mm)", "Height (mm)", "Gemstone Dimensions"],
+      sizeRange: ["Mix Size Range", "Size Range"],
+      caratTotal: ["Stone Weight - Carat Total", "Carat", "Weight", "Carat Weight", "Weight (ct)", "Total Carat Weight", "TCW", "Gemstone Carat / Weight"],
+      pieces: ["Pieces", "Qty", "Quantity", "Gemstone Pcs"],
+      purchasePerCt: ["Purchase Price per Carat", "Purchase $/ct"],
+      b2bPerCt: ["B2B Price/Ct", "B2B - Price/Ct", "B2B $/ct"],
+      retailPerCt: ["Retail Price/Ct", "Retail - Price/Ct", "Retail $/ct", "Price per ct", "Price/Ct", "Sale Price"],
+      totalPrice: ["Total USD Amount", "Total Amount (USD)", "Total Price"],
+      status: ["Status", "Availability", "In Stock", "Available"],
+      imageUrl: ["Image URL", "Image", "Img", "Image Link", "Photo URL", "Picture"],
+      certificate: ["Certificates", "Certificate"],
+      certificateNumber: ["Certificate Number", "Cert #"],
+      treatment: ["Gemstone Treatment", "Treatment"],
+      source: ["Gemstone Source", "Source"]
+    };
+    // 3) Color map for swatches (extend as you like)
+    const COLOR_MAP = {
+      red: "#DC2626", ruby: "#E11D48", pink: "#EC4899", fuchsia: "#C026D3",
+      purple: "#7C3AED", violet: "#8B5CF6", blue: "#2563EB", teal: "#0D9488",
+      green: "#16A34A", yellow: "#F59E0B", orange: "#EA580C", brown: "#92400E",
+      champagne: "#E8D6B0", peach: "#F4A38C", black: "#111827", white: "#F3F4F6",
+      colorless: "#F3F4F6", gray: "#9CA3AF"
+    };
+
+    // If color not found, fall back by stone type
+    const STONE_DEFAULT = {
+      sapphire: "#2563EB", ruby: "#E11D48", emerald: "#16A34A", diamond: "#F3F4F6",
+      spinel: "#7C3AED", tourmaline: "#10B981", garnet: "#B91C1C", topaz: "#60A5FA"
+    };
+
+    // Preview CSV link in header
+    const _csv0 = SHEET_SOURCES[0]?.url || '#';
+    document.getElementById('csvLink').href = _csv0;
+
+    // ========= UTILITIES =========
+    // Quality score 1..5 → labels like A..AAAAA
+    function gradeLabel(score){
+      if (score >= 4.75) return 'AAAAA';
+      if (score >= 3.75) return 'AAAA';
+      if (score >= 2.75) return 'AAA';
+      if (score >= 1.75) return 'AA';
+      return 'A';
+    }
+    function clarityScore(c){
+      const map = { IF:5, VVS:4.5, VVVS:4.5, VS:4, SI:3, I1:2, Opaque:1.5, Translucent:2.5 };
+      return map[(c||'').toUpperCase()] || 3;
+    }
+    function treatmentPenalty(t){
+      const s = (t||'').toLowerCase();
+      if (!s || /none|unheated|no oil|untreated/.test(s)) return 0.5; // small bonus
+      if (/minor oil/.test(s)) return -0.2;
+      if (/moderate|irradiated|glass|stabilized/.test(s)) return -0.6;
+      return -0.3;
+    }
+    function calcQuality(x){
+      let base = clarityScore(x.clarity);
+      base += treatmentPenalty(x.treatment);
+      base = Math.max(1, Math.min(5, base));
+      return base;
+    }
+
+    const normKey = s => String(s || "").trim().toLowerCase();
+    const byAliases = (row, aliases) => {
+      for (const a of aliases) {
+        const v = row[a] ?? row[Object.keys(row).find(k => normKey(k) === normKey(a))];
+        if (v != null && v !== "") return v;
+      }
+      return "";
+    };
+    const parseCurrency = (v) => {
+      if (v == null) return null;
+      const n = String(v).replace(/[^0-9.\-]/g, "");
+      const f = parseFloat(n);
+      return Number.isFinite(f) ? f : null;
+    };
+    const parseNumber = (v) => {
+      if (v == null) return null;
+      const n = String(v).replace(/[^0-9.\-]/g, "");
+      const f = parseFloat(n);
+      return Number.isFinite(f) ? f : null;
+    };
+    const fmtMoney = (n) => n == null ? "-" : `$${n.toLocaleString(undefined,{maximumFractionDigits:0})}`;
+    const fmtCarat = (n) => n == null ? "-" : `${n.toFixed(2)} ct`;
+
+    const colorHex = (stone, color) => {
+      const c = normKey(color);
+      if (COLOR_MAP[c]) return COLOR_MAP[c];
+      const s = normKey(stone);
+      return STONE_DEFAULT[s] || "#CBD5E1"; // slate-300
+    };
+
+    // ========= STATE =========
+    let ALL = [];         // full dataset
+    let VIEW = [];        // filtered + sorted
+    let FACETS = {
+        tab: uniq(ALL.map(x=>x.tab)),
+        stone: uniq(ALL.map(x=>x.stone)),
+        color: uniq(ALL.map(x=>x.color)),
+        shape: uniq(ALL.map(x=>x.shape)),
+        clarity: uniq(ALL.map(x=>x.clarity)),
+        origin: uniq(ALL.map(x=>x.origin)),
+        shade: uniq(ALL.map(x=>x.shade)),
+        status: uniq(ALL.map(x=>x.status))
+      };      // unique values per facet
+
+    const state = {
+      q: "",
+      stone: new Set(),
+      color: new Set(),
+      shape: new Set(),
+      clarity: new Set(),
+      origin: new Set(),
+      shade: new Set(),
+      status: new Set(),
+      certificate: new Set(),
+      treatment: new Set(),
+      pair: new Set(),
+      minCt: null, maxCt: null,     // carat
+      minTotal: null, maxTotal: null, // total price
+      qualityMin: 1, qualityMax: 5,
+      sort: 'featured',
+      page: 1, perPage: 24
+    };
+
+    // ========= LOADERS =========
+    function showSkeletons(count=12) {
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+      const tpl = document.getElementById('skeletonTpl').content;
+      for (let i=0;i<count;i++) grid.appendChild(tpl.cloneNode(true));
+    }
+
+    async function loadCSV(url) {
+      return new Promise((resolve, reject) => {
+        Papa.parse(url, {
+          download: true,
+          header: true,
+          skipEmptyLines: true,
+          complete: (res) => resolve(res.data),
+          error: reject
+        });
+      });
+    }
+
+    function mapRow(row) {
+      const o = {
+        originalId: byAliases(row, COLS.originalId),
+        stockId: byAliases(row, COLS.stockId),
+        stone: byAliases(row, COLS.stone),
+        origin: byAliases(row, COLS.origin),
+        shade: byAliases(row, COLS.shade),
+        color: byAliases(row, COLS.color),
+        clarity: byAliases(row, COLS.clarity),
+        shape: byAliases(row, COLS.shape),
+        sizeMm: byAliases(row, COLS.sizeMm),
+        sizeRange: byAliases(row, COLS.sizeRange),
+        caratTotal: parseNumber(byAliases(row, COLS.caratTotal)),
+        pieces: parseNumber(byAliases(row, COLS.pieces)),
+        purchasePerCt: parseCurrency(byAliases(row, COLS.purchasePerCt)),
+        b2bPerCt: parseCurrency(byAliases(row, COLS.b2bPerCt)),
+        retailPerCt: parseCurrency(byAliases(row, COLS.retailPerCt)),
+        totalPrice: parseCurrency(byAliases(row, COLS.totalPrice)),
+        status: byAliases(row, COLS.status) || 'On-Site',
+        imageUrl: byAliases(row, COLS.imageUrl),
+        certificate: byAliases(row, COLS.certificate),
+        certificateNumber: byAliases(row, COLS.certificateNumber),
+        treatment: byAliases(row, COLS.treatment),
+        source: byAliases(row, COLS.source)
+      };
+      // derive total if absent
+      if (o.totalPrice == null && o.caratTotal && o.retailPerCt) o.totalPrice = +(o.caratTotal * o.retailPerCt).toFixed(2);
+      // normalized helpers
+      o.isPair = (o.pieces || 1) >= 2 ? 'Pair' : 'Single';
+      o.qualityScore = calcQuality(o); // 1..5
+      o.qualityLabel = gradeLabel(o.qualityScore); // A..AAAAA
+      return o;
+    }
+
+    async function loadData() {
+      showSkeletons();
+      try {
+        let rows = [];
+        if (SHEET_SOURCES && SHEET_SOURCES.length) {
+          const parts = await Promise.all(
+            SHEET_SOURCES.map(async (src) => {
+              const url = ALWAYS_FRESH ? (src.url + (src.url.includes('?') ? '&' : '?') + 'cb=' + Date.now()) : src.url;
+              const data = await loadCSV(url);
+              return data.map(r => ({...r, __tab: src.name || 'Sheet'}));
+            })
+          );
+          rows = parts.flat();
+        }
+        // Map
+        ALL = rows.map(r => { const m = mapRow(r); m.tab = r.__tab || 'Sheet'; return m; });
+        // Build facets and ranges
+        buildFacets();
+        computeDynamicRanges();
+        readURL();
+        applyFilters();
+      } catch (e) {
+        console.error(e);
+        alert('Failed to load data. Check your CSV URL(s) or network.');
+      }
+    }
+
+    // ========= FACETS =========
+    function uniq(list) {
+      return [...new Set(list.filter(Boolean).map(v => String(v).trim()))].sort((a,b)=>a.localeCompare(b));
+    }
+
+    function buildFacets() {
+      FACETS = {
+        tab: uniq(ALL.map(x=>x.tab)),
+        stone: uniq(ALL.map(x=>x.stone)),
+        color: uniq(ALL.map(x=>x.color)),
+        shape: uniq(ALL.map(x=>x.shape)),
+        clarity: uniq(ALL.map(x=>x.clarity)),
+        origin: uniq(ALL.map(x=>x.origin)),
+        shade: uniq(ALL.map(x=>x.shade)),
+        status: uniq(ALL.map(x=>x.status)),
+        certificate: uniq(ALL.map(x=>x.certificate)),
+        treatment: uniq(ALL.map(x=>x.treatment)),
+        pair: uniq(ALL.map(x=>x.isPair))
+      };
+      renderFacets();
+      renderToolbar();
+    };
+      renderFacets();
+    }
+
+    function facetSection(id, title, items, renderLabel) {
+      const wrap = document.createElement('div');
+      wrap.className = 'border-t border-gray-200 pt-3';
+      wrap.innerHTML = `<details open class="group">
+        <summary class="cursor-pointer list-none flex items-center justify-between text-sm font-medium text-gray-900 select-none">
+          <span>${title}</span>
+          <span class="text-gray-400 group-open:rotate-180 transition"><i data-feather="chevron-down"></i></span>
+        </summary>
+        <div class="mt-2 flex flex-wrap gap-2" id="facet-${id}"></div>
+      </details>`;
+      const box = wrap.querySelector(`#facet-${id}`);
+      items.forEach(val => {
+        const btn = document.createElement('button');
+        btn.className = 'px-2 py-1 rounded-lg border border-gray-300 text-xs bg-white hover:bg-gray-50 flex items-center gap-1';
+        btn.dataset.val = val;
+        btn.addEventListener('click', () => { toggleSet(state[id], val); state.page = 1; applyFilters(); });
+        if (renderLabel) btn.appendChild(renderLabel(val)); else btn.textContent = val;
+        box.appendChild(btn);
+      });
+      return wrap;
+    }
+
+    function renderFacets() {
+      const facetsEl = document.getElementById('facets');
+      facetsEl.innerHTML = '';
+
+      // Stone
+      facetsEl.appendChild(facetSection('stone','Stone', FACETS.stone));
+
+      // Color with swatch
+      facetsEl.appendChild(facetSection('color','Color', FACETS.color, (val)=>{
+        const span = document.createElement('span');
+        const dot = document.createElement('span');
+        dot.className = 'swatch';
+        dot.style.background = colorHex(null, val);
+        const txt = document.createElement('span'); txt.textContent = val;
+        span.append(dot, txt); return span;
+      }));
+
+      // Other facets
+      facetsEl.appendChild(facetSection('shape','Shape', FACETS.shape));
+      facetsEl.appendChild(facetSection('clarity','Clarity', FACETS.clarity));
+      facetsEl.appendChild(facetSection('origin','Origin', FACETS.origin));
+      facetsEl.appendChild(facetSection('shade','Shade', FACETS.shade));
+      facetsEl.appendChild(facetSection('status','Status', FACETS.status));
+      facetsEl.appendChild(facetSection('certificate','Certificate', FACETS.certificate));
+      facetsEl.appendChild(facetSection('treatment','Enhancement', FACETS.treatment));
+      facetsEl.appendChild(facetSection('pair','Single/Pair', FACETS.pair));
+
+      // Range filters
+      const rangeWrap = document.createElement('div');
+      rangeWrap.className = 'border-t border-gray-200 pt-3 space-y-3';
+      rangeWrap.innerHTML = `
+        <div>
+          <div class="text-sm font-medium">Carat</div>
+          <div class="mt-2 grid grid-cols-2 gap-2">
+            <input id="minCt" type="number" step="0.01" placeholder="Min" class="rounded-lg border-gray-300" />
+            <input id="maxCt" type="number" step="0.01" placeholder="Max" class="rounded-lg border-gray-300" />
+          </div>
+        </div>
+        <div>
+          <div class="text-sm font-medium">Total Price ($)</div>
+          <div class="mt-2 grid grid-cols-2 gap-2">
+            <input id="minTotal" type="number" step="1" placeholder="Min" class="rounded-lg border-gray-300" />
+            <input id="maxTotal" type="number" step="1" placeholder="Max" class="rounded-lg border-gray-300" />
+          </div>
+        </div>`;
+      facetsEl.appendChild(rangeWrap);
+
+      // Hook up inputs
+      ['minCt','maxCt','minTotal','maxTotal'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('change', () => { state[id] = parseNumber(el.value); state.page = 1; applyFilters();});
+      });
+    }));
+
+      // Other facets
+      facetsEl.appendChild(facetSection('shape','Shape', FACETS.shape));
+      facetsEl.appendChild(facetSection('clarity','Clarity', FACETS.clarity));
+      facetsEl.appendChild(facetSection('origin','Origin', FACETS.origin));
+      facetsEl.appendChild(facetSection('shade','Shade', FACETS.shade));
+      facetsEl.appendChild(facetSection('status','Status', FACETS.status));
+
+      // Range filters
+      const rangeWrap = document.createElement('div');
+      rangeWrap.className = 'border-t border-gray-200 pt-3 space-y-3';
+      rangeWrap.innerHTML = `
+        <div>
+          <div class="text-sm font-medium">Carat</div>
+          <div class="mt-2 grid grid-cols-2 gap-2">
+            <input id="minCt" type="number" step="0.01" placeholder="Min" class="rounded-lg border-gray-300" />
+            <input id="maxCt" type="number" step="0.01" placeholder="Max" class="rounded-lg border-gray-300" />
+          </div>
+        </div>
+        <div>
+          <div class="text-sm font-medium">Retail Price/Ct ($)</div>
+          <div class="mt-2 grid grid-cols-2 gap-2">
+            <input id="minP" type="number" step="1" placeholder="Min" class="rounded-lg border-gray-300" />
+            <input id="maxP" type="number" step="1" placeholder="Max" class="rounded-lg border-gray-300" />
+          </div>
+        </div>`;
+      facetsEl.appendChild(rangeWrap);
+
+      // Hook up inputs
+      ['minCt','maxCt','minP','maxP'].forEach(id => {
+        document.getElementById(id).addEventListener('change', () => { state[id] = parseNumber(document.getElementById(id).value); state.page = 1; applyFilters();});
+      });
+    }
+
+    function toggleSet(set, val){ set.has(val) ? set.delete(val) : set.add(val); }
+
+    // ========= FILTER + SORT =========
+    function matchesText(x, q) {
+      if (!q) return true;
+      const hay = `${x.stockId} ${x.originalId} ${x.stone} ${x.color} ${x.shape} ${x.clarity} ${x.origin} ${x.shade}`.toLowerCase();
+      return hay.includes(q.toLowerCase());
+    }
+
+    function inSetOrAny(set, val){ return set.size === 0 || set.has(val); }
+
+    function passesRanges(x) {
+      if (state.minCt != null && !(x.caratTotal != null && x.caratTotal >= state.minCt)) return false;
+      if (state.maxCt != null && !(x.caratTotal != null && x.caratTotal <= state.maxCt)) return false;
+      if (state.minTotal != null && !(x.totalPrice != null && x.totalPrice >= state.minTotal)) return false;
+      if (state.maxTotal != null && !(x.totalPrice != null && x.totalPrice <= state.maxTotal)) return false;
+      if (state.qualityMin != null && !(x.qualityScore >= state.qualityMin)) return false;
+      if (state.qualityMax != null && !(x.qualityScore <= state.qualityMax)) return false;
+      return true;
+    }
+
+    function sortView(list) {
+      const s = state.sort;
+      const copy = [...list];
+      switch (s) {
+        case 'priceAsc': return copy.sort((a,b) => (a.retailPerCt ?? Infinity) - (b.retailPerCt ?? Infinity));
+        case 'priceDesc': return copy.sort((a,b) => (b.retailPerCt ?? -Infinity) - (a.retailPerCt ?? -Infinity));
+        case 'caratAsc': return copy.sort((a,b) => (a.caratTotal ?? Infinity) - (b.caratTotal ?? Infinity));
+        case 'caratDesc': return copy.sort((a,b) => (b.caratTotal ?? -Infinity) - (a.caratTotal ?? -Infinity));
+        case 'newest': return copy.sort((a,b) => b.stockId.localeCompare(a.stockId));
+        default: return copy; // featured: as-is
+      }
+    }
+
+    function applyFilters() {
+      // Filter
+      VIEW = ALL.filter(x =>
+        matchesText(x, state.q)
+        && inSetOrAny(state.stone, x.stone)
+        && inSetOrAny(state.color, x.color)
+        && inSetOrAny(state.shape, x.shape)
+        && inSetOrAny(state.clarity, x.clarity)
+        && inSetOrAny(state.origin, x.origin)
+        && inSetOrAny(state.shade, x.shade)
+        && inSetOrAny(state.status, x.status)
+        && inSetOrAny(state.certificate, x.certificate)
+        && inSetOrAny(state.treatment, x.treatment)
+        && inSetOrAny(state.pair, x.isPair)
+        && passesRanges(x)
+      );
+
+      VIEW = sortView(VIEW);
+
+      renderPills();
+      writeURL();
+      renderGrid();
+    }
+
+    // ========= URL SYNC =========
+    function writeURL(){
+      const params = new URLSearchParams();
+      if (state.q) params.set('q', state.q);
+      for (const k of ['stone','color','shape','clarity','origin','shade','status','certificate','treatment','pair']) {
+        if (state[k].size) params.set(k, [...state[k]].join(','));
+      }
+      if (state.minCt != null) params.set('minCt', state.minCt);
+      if (state.maxCt != null) params.set('maxCt', state.maxCt);
+      if (state.minP != null) params.set('minP', state.minP);
+      if (state.maxP != null) params.set('maxP', state.maxP);
+      if (state.sort && state.sort !== 'featured') params.set('sort', state.sort);
+      if (state.page > 1) params.set('page', state.page);
+      if (state.perPage !== 24) params.set('pp', state.perPage);
+      const q = params.toString();
+      history.replaceState(null, '', q ? `?${q}` : location.pathname);
+    }
+
+    function readURL(){
+      const params = new URLSearchParams(location.search);
+      state.q = params.get('q') || '';
+      document.getElementById('q').value = state.q;
+      for (const k of ['stone','color','shape','clarity','origin','shade','status','certificate','treatment','pair']) {
+        for (const val of state[k]) addPill(k[0].toUpperCase()+k.slice(1), val, ()=>{ state[k].delete(val); applyFilters(); });
+      }
+      state.minCt = parseNumber(params.get('minCt'));
+      state.maxCt = parseNumber(params.get('maxCt'));
+      state.minP = parseNumber(params.get('minP'));
+      state.maxP = parseNumber(params.get('maxP'));
+      ['minCt','maxCt','minP','maxP'].forEach(id => {
+        const v = state[id]; if (v != null) document.getElementById(id).value = v;
+      });
+      state.sort = params.get('sort') || 'featured';
+      document.getElementById('sort').value = state.sort;
+      state.page = parseInt(params.get('page') || '1', 10);
+      state.perPage = parseInt(params.get('pp') || '24', 10);
+      document.getElementById('perPage').value = String(state.perPage);
+      // toolbar selects (set defaults)
+      const qMin = document.getElementById('qualityMin');
+      const qMax = document.getElementById('qualityMax');
+      if (qMin && qMax){ qMin.value = String(state.qualityMin || 1); qMax.value = String(state.qualityMax || 5); }
+    }
+
+    // ========= RENDER =========
+    function renderPills(){
+      const box = document.getElementById('activePills');
+      box.innerHTML = '';
+      const addPill = (label, val, unset) => {
+        const span = document.createElement('span');
+        span.className = 'pill';
+        span.innerHTML = `<span>${label}: <b>${val}</b></span> <button class="text-gray-400 hover:text-gray-600" aria-label="Remove">×</button>`;
+        span.querySelector('button').addEventListener('click', unset);
+        box.appendChild(span);
+      };
+      if (state.q) addPill('Search', state.q, ()=>{ state.q=''; document.getElementById('q').value=''; applyFilters(); });
+      for (const k of ['stone','color','shape','clarity','origin','shade','status']) {
+        for (const val of state[k]) addPill(k[0].toUpperCase()+k.slice(1), val, ()=>{ state[k].delete(val); applyFilters(); });
+      }
+      if (state.minCt != null) addPill('Min ct', state.minCt, ()=>{ state.minCt=null; document.getElementById('minCt').value=''; applyFilters(); });
+      if (state.maxCt != null) addPill('Max ct', state.maxCt, ()=>{ state.maxCt=null; document.getElementById('maxCt').value=''; applyFilters(); });
+      if (state.minP != null) addPill('Min $/ct', state.minP, ()=>{ state.minP=null; document.getElementById('minP').value=''; applyFilters(); });
+      if (state.maxP != null) addPill('Max $/ct', state.maxP, ()=>{ state.maxP=null; document.getElementById('maxP').value=''; applyFilters(); });
+    }
+
+    function renderGrid(){
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+
+      const total = VIEW.length;
+      document.getElementById('resultCount').textContent = total;
+
+      const pages = Math.max(1, Math.ceil(total / state.perPage));
+      state.page = Math.min(state.page, pages);
+      document.getElementById('page').textContent = state.page;
+      document.getElementById('pages').textContent = pages;
+      document.getElementById('prevPage').disabled = state.page <= 1;
+      document.getElementById('nextPage').disabled = state.page >= pages;
+
+      const start = (state.page - 1) * state.perPage;
+      const end = start + state.perPage;
+      const slice = VIEW.slice(start, end);
+
+      const tpl = document.getElementById('cardTpl').content;
+      for (const x of slice) {
+        const node = tpl.cloneNode(true);
+        const img = node.querySelector('img');
+        img.src = x.imageUrl || `https://placehold.co/600x600?text=${encodeURIComponent(x.stone || 'Gem')}`;
+        img.alt = `${x.stone || ''} ${x.color || ''} ${x.shape || ''}`.trim();
+
+        // Badges
+        node.querySelector('[data-badge="stone"]').textContent = x.stone || '';
+        const bc = node.querySelector('[data-badge="color"]');
+        bc.querySelector('.swatch').style.background = colorHex(x.stone, x.color);
+        bc.querySelector('[data-badge-label]').textContent = x.color || '—';
+
+        // Title link
+        const a = node.querySelector('[data-stock]');
+        a.textContent = x.stockId || x.originalId || '—';
+        a.href = x.imageUrl || '#';
+
+        // Price + carat
+        node.querySelector('[data-retail]').textContent = fmtMoney(x.retailPerCt) + ' / ct';
+        node.querySelector('[data-carat]').textContent = fmtCarat(x.caratTotal);
+
+        // Meta line
+        node.querySelector('[data-shape]').textContent = x.shape || '—';
+        node.querySelector('[data-clarity]').textContent = x.clarity || '—';
+        node.querySelector('[data-origin]').textContent = [x.origin, x.shade].filter(Boolean).join(' · ');
+
+        // Size
+        const sizeBits = [x.sizeMm, x.sizeRange].filter(Boolean).join(' | ');
+        node.querySelector('[data-size]').textContent = sizeBits;
+
+        grid.appendChild(node);
+      }
+
+      if (slice.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'col-span-full text-center py-12 text-gray-500';
+        empty.innerHTML = '<div class="text-lg font-medium">No matches</div><div class="text-sm">Try removing a filter or broadening your ranges.</div>';
+        grid.appendChild(empty);
+      }
+    }
+
+    // ========= EVENTS =========
+    function computeDynamicRanges(){
+      const carats = ALL.map(x=>x.caratTotal).filter(v=>v!=null);
+      const totals = ALL.map(x=>x.totalPrice).filter(v=>v!=null);
+      const minCt = carats.length? Math.min(...carats):0;
+      const maxCt = carats.length? Math.max(...carats):10;
+      const minTotal = totals.length? Math.min(...totals):0;
+      const maxTotal = totals.length? Math.max(...totals):10000;
+      const assign = (id,val)=>{ const el=document.getElementById(id); if(el) el.value = String(val); };
+      // set placeholders/values in toolbar & sidebar
+      assign('caratMin', minCt.toFixed(2)); assign('caratMax', maxCt.toFixed(2));
+      assign('priceMin', Math.floor(minTotal)); assign('priceMax', Math.ceil(maxTotal));
+      const originSel = document.getElementById('selOrigin');
+      const claritySel = document.getElementById('selClarity');
+      const certSel = document.getElementById('selCert');
+      const treatSel = document.getElementById('selTreatment');
+      if (originSel){ originSel.innerHTML = '<option value="">Origin</option>' + FACETS.origin.map(o=>`<option>${o}</option>`).join(''); }
+      if (claritySel){ claritySel.innerHTML = '<option value="">Clarity</option>' + FACETS.clarity.map(o=>`<option>${o}</option>`).join(''); }
+      if (certSel){ certSel.innerHTML = '<option value="">Certificate</option>' + FACETS.certificate.map(o=>`<option>${o}</option>`).join(''); }
+      if (treatSel){ treatSel.innerHTML = '<option value="">Enhancement</option>' + FACETS.treatment.map(o=>`<option>${o}</option>`).join(''); }
+
+      // Chips
+      renderChips('chipStones', FACETS.stone, (val)=>{ toggleSet(state.stone, val); state.page=1; applyFilters(); }, (val)=>{
+        return `<span class=\"swatch mr-1\" style=\"background:${colorHex(val,val)}\"></span>${val}`;
+      });
+      renderChips('chipShapes', FACETS.shape, (val)=>{ toggleSet(state.shape, val); state.page=1; applyFilters(); });
+    }
+
+    function renderChips(id, items, onClick, labelRenderer){
+      const box = document.getElementById(id); if(!box) return;
+      box.innerHTML = '';
+      items.forEach(val=>{
+        const btn = document.createElement('button');
+        btn.className = 'px-2 py-1 rounded-lg border border-gray-300 text-xs bg-white hover:bg-gray-50 flex items-center gap-1';
+        btn.innerHTML = labelRenderer? labelRenderer(val): val;
+        btn.addEventListener('click', ()=> onClick(val));
+        box.appendChild(btn);
+      });
+    }
+
+    function renderToolbar(){ computeDynamicRanges(); }
+
+    // Toolbar listeners
+    const bind = (id, fn)=>{ const el=document.getElementById(id); if(el) el.addEventListener('change', fn); };
+    bind('priceMin', ()=>{ state.minTotal = parseNumber(document.getElementById('priceMin').value); state.page=1; applyFilters(); });
+    bind('priceMax', ()=>{ state.maxTotal = parseNumber(document.getElementById('priceMax').value); state.page=1; applyFilters(); });
+    bind('caratMin', ()=>{ state.minCt = parseNumber(document.getElementById('caratMin').value); state.page=1; applyFilters(); });
+    bind('caratMax', ()=>{ state.maxCt = parseNumber(document.getElementById('caratMax').value); state.page=1; applyFilters(); });
+    bind('qualityMin', ()=>{ state.qualityMin = parseNumber(document.getElementById('qualityMin').value); state.page=1; applyFilters(); });
+    bind('qualityMax', ()=>{ state.qualityMax = parseNumber(document.getElementById('qualityMax').value); state.page=1; applyFilters(); });
+    bind('selOrigin', ()=>{ state.origin = new Set(document.getElementById('selOrigin').value? [document.getElementById('selOrigin').value]:[]); state.page=1; applyFilters(); });
+    bind('selClarity', ()=>{ state.clarity = new Set(document.getElementById('selClarity').value? [document.getElementById('selClarity').value]:[]); state.page=1; applyFilters(); });
+    bind('selTreatment', ()=>{ state.treatment = new Set(document.getElementById('selTreatment').value? [document.getElementById('selTreatment').value]:[]); state.page=1; applyFilters(); });
+    bind('selCert', ()=>{ state.certificate = new Set(document.getElementById('selCert').value? [document.getElementById('selCert').value]:[]); state.page=1; applyFilters(); });
+    bind('selPair', ()=>{ state.pair = new Set(document.getElementById('selPair').value? [document.getElementById('selPair').value]:[]); state.page=1; applyFilters(); });
+
+    // ========= EVENTS =========
+    function computeDynamicRanges(){
+      const carats = ALL.map(x=>x.caratTotal).filter(v=>v!=null);
+      const totals = ALL.map(x=>x.totalPrice).filter(v=>v!=null);
+      const minCt = carats.length? Math.min(...carats):0;
+      const maxCt = carats.length? Math.max(...carats):10;
+      const minTotal = totals.length? Math.min(...totals):0;
+      const maxTotal = totals.length? Math.max(...totals):10000;
+      const assign = (id,val)=>{ const el=document.getElementById(id); if(el) el.value = String(val); };
+      // set placeholders/values in toolbar & sidebar
+      assign('caratMin', minCt.toFixed(2)); assign('caratMax', maxCt.toFixed(2));
+      assign('priceMin', Math.floor(minTotal)); assign('priceMax', Math.ceil(maxTotal));
+      const originSel = document.getElementById('selOrigin');
+      const claritySel = document.getElementById('selClarity');
+      const certSel = document.getElementById('selCert');
+      const treatSel = document.getElementById('selTreatment');
+      if (originSel){ originSel.innerHTML = '<option value="">Origin</option>' + FACETS.origin.map(o=>`<option>${o}</option>`).join(''); }
+      if (claritySel){ claritySel.innerHTML = '<option value="">Clarity</option>' + FACETS.clarity.map(o=>`<option>${o}</option>`).join(''); }
+      if (certSel){ certSel.innerHTML = '<option value="">Certificate</option>' + FACETS.certificate.map(o=>`<option>${o}</option>`).join(''); }
+      if (treatSel){ treatSel.innerHTML = '<option value="">Enhancement</option>' + FACETS.treatment.map(o=>`<option>${o}</option>`).join(''); }
+
+      // Chips
+      renderChips('chipStones', FACETS.stone, (val)=>{ toggleSet(state.stone, val); state.page=1; applyFilters(); }, (val)=>{
+        return `<span class=\"swatch mr-1\" style=\"background:${colorHex(val,val)}\"></span>${val}`;
+      });
+      renderChips('chipShapes', FACETS.shape, (val)=>{ toggleSet(state.shape, val); state.page=1; applyFilters(); });
+    }
+
+    function renderChips(id, items, onClick, labelRenderer){
+      const box = document.getElementById(id); if(!box) return;
+      box.innerHTML = '';
+      items.forEach(val=>{
+        const btn = document.createElement('button');
+        btn.className = 'px-2 py-1 rounded-lg border border-gray-300 text-xs bg-white hover:bg-gray-50 flex items-center gap-1';
+        btn.innerHTML = labelRenderer? labelRenderer(val): val;
+        btn.addEventListener('click', ()=> onClick(val));
+        box.appendChild(btn);
+      });
+    }
+
+    function renderToolbar(){ computeDynamicRanges(); }
+
+    // Toolbar listeners
+    const bind = (id, fn)=>{ const el=document.getElementById(id); if(el) el.addEventListener('change', fn); };
+    bind('priceMin', ()=>{ state.minTotal = parseNumber(document.getElementById('priceMin').value); state.page=1; applyFilters(); });
+    bind('priceMax', ()=>{ state.maxTotal = parseNumber(document.getElementById('priceMax').value); state.page=1; applyFilters(); });
+    bind('caratMin', ()=>{ state.minCt = parseNumber(document.getEl
+    document.getElementById('q').addEventListener('input', (e)=>{ state.q = e.target.value; state.page = 1; applyFilters(); });
+    document.getElementById('sort').addEventListener('change', (e)=>{ state.sort = e.target.value; applyFilters(); });
+    document.getElementById('perPage').addEventListener('change', (e)=>{ state.perPage = parseInt(e.target.value,10); state.page = 1; applyFilters(); });
+    document.getElementById('prevPage').addEventListener('click', ()=>{ state.page = Math.max(1, state.page-1); applyFilters(); });
+    document.getElementById('nextPage').addEventListener('click', ()=>{ state.page = state.page+1; applyFilters(); });
+    document.getElementById('clearAll').addEventListener('click', ()=>{
+      state.q = '';
+      document.getElementById('q').value = '';
+      for (const k of ['stone','color','shape','clarity','origin','shade','status']) state[k].clear();
+      ['minCt','maxCt','minP','maxP'].forEach(id => document.getElementById(id).value = '');
+      state.minCt = state.maxCt = state.minP = state.maxP = null;
+      state.sort = 'featured'; document.getElementById('sort').value = 'featured';
+      state.page = 1; applyFilters();
+    });
+    document.getElementById('refreshBtn').addEventListener('click', ()=> loadData());
+
+    // ========= BOOT =========
+    feather.replace();
+    loadData();
+  </script>
+
+  <!--
+  =====================================
