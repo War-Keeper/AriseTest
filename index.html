@@ -824,68 +824,74 @@
     bind('selCert', ()=>{ state.certificate = new Set(document.getElementById('selCert').value? [document.getElementById('selCert').value]:[]); state.page=1; applyFilters(); });
     bind('selPair', ()=>{ state.pair = new Set(document.getElementById('selPair').value? [document.getElementById('selPair').value]:[]); state.page=1; applyFilters(); });
 
-    // ========= EVENTS =========
-    function computeDynamicRanges(){
-      const carats = ALL.map(x=>x.caratTotal).filter(v=>v!=null);
-      const totals = ALL.map(x=>x.totalPrice).filter(v=>v!=null);
-      const minCt = carats.length? Math.min(...carats):0;
-      const maxCt = carats.length? Math.max(...carats):10;
-      const minTotal = totals.length? Math.min(...totals):0;
-      const maxTotal = totals.length? Math.max(...totals):10000;
-      const assign = (id,val)=>{ const el=document.getElementById(id); if(el) el.value = String(val); };
-      // set placeholders/values in toolbar & sidebar
-      assign('caratMin', minCt.toFixed(2)); assign('caratMax', maxCt.toFixed(2));
-      assign('priceMin', Math.floor(minTotal)); assign('priceMax', Math.ceil(maxTotal));
-      const originSel = document.getElementById('selOrigin');
-      const claritySel = document.getElementById('selClarity');
-      const certSel = document.getElementById('selCert');
-      const treatSel = document.getElementById('selTreatment');
-      if (originSel){ originSel.innerHTML = '<option value="">Origin</option>' + FACETS.origin.map(o=>`<option>${o}</option>`).join(''); }
-      if (claritySel){ claritySel.innerHTML = '<option value="">Clarity</option>' + FACETS.clarity.map(o=>`<option>${o}</option>`).join(''); }
-      if (certSel){ certSel.innerHTML = '<option value="">Certificate</option>' + FACETS.certificate.map(o=>`<option>${o}</option>`).join(''); }
-      if (treatSel){ treatSel.innerHTML = '<option value="">Enhancement</option>' + FACETS.treatment.map(o=>`<option>${o}</option>`).join(''); }
+    <!-- replace ONLY the EVENTS block with this -->
+<script>
+// ========= EVENTS / TOOLBAR HELPERS =========
+function computeDynamicRanges(){
+  const carats = ALL.map(x=>x.caratTotal).filter(v=>v!=null);
+  const totals = ALL.map(x=>x.totalPrice).filter(v=>v!=null);
+  const minCt = carats.length? Math.min(...carats):0;
+  const maxCt = carats.length? Math.max(...carats):10;
+  const minTotal = totals.length? Math.min(...totals):0;
+  const maxTotal = totals.length? Math.max(...totals):10000;
 
-      // Chips
-      renderChips('chipStones', FACETS.stone, (val)=>{ toggleSet(state.stone, val); state.page=1; applyFilters(); }, (val)=>{
-        return `<span class=\"swatch mr-1\" style=\"background:${colorHex(val,val)}\"></span>${val}`;
-      });
-      renderChips('chipShapes', FACETS.shape, (val)=>{ toggleSet(state.shape, val); state.page=1; applyFilters(); });
-    }
+  const setVal = (id,val)=>{ const el=document.getElementById(id); if(el && !el.value) el.value = String(val); };
+  setVal('caratMin', minCt.toFixed(2));
+  setVal('caratMax', maxCt.toFixed(2));
+  setVal('priceMin', Math.floor(minTotal));
+  setVal('priceMax', Math.ceil(maxTotal));
 
-    function renderChips(id, items, onClick, labelRenderer){
-      const box = document.getElementById(id); if(!box) return;
-      box.innerHTML = '';
-      items.forEach(val=>{
-        const btn = document.createElement('button');
-        btn.className = 'px-2 py-1 rounded-lg border border-gray-300 text-xs bg-white hover:bg-gray-50 flex items-center gap-1';
-        btn.innerHTML = labelRenderer? labelRenderer(val): val;
-        btn.addEventListener('click', ()=> onClick(val));
-        box.appendChild(btn);
-      });
-    }
+  const fill = (id, label, items)=> {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = `<option value=\"\">${label}</option>` + items.map(o=>`<option>${o}</option>`).join('');
+  };
+  fill('selOrigin','Origin', FACETS.origin);
+  fill('selClarity','Clarity', FACETS.clarity);
+  fill('selCert','Certificate', FACETS.certificate);
+  fill('selTreatment','Enhancement', FACETS.treatment);
 
-    function renderToolbar(){ computeDynamicRanges(); }
+  renderChips('chipStones', FACETS.stone, (val)=>{ toggleSet(state.stone, val); state.page=1; applyFilters(); },
+    (val)=>`<span class=\"swatch mr-1\" style=\"background:${colorHex(val,val)}\"></span>${val}`);
+  renderChips('chipShapes', FACETS.shape, (val)=>{ toggleSet(state.shape, val); state.page=1; applyFilters(); });
+}
 
-    // Toolbar listeners
-    const bind = (id, fn)=>{ const el=document.getElementById(id); if(el) el.addEventListener('change', fn); };
-    bind('priceMin', ()=>{ state.minTotal = parseNumber(document.getElementById('priceMin').value); state.page=1; applyFilters(); });
-    bind('priceMax', ()=>{ state.maxTotal = parseNumber(document.getElementById('priceMax').value); state.page=1; applyFilters(); });
-    bind('caratMin', ()=>{ state.minCt = parseNumber(document.getEl
-    document.getElementById('q').addEventListener('input', (e)=>{ state.q = e.target.value; state.page = 1; applyFilters(); });
-    document.getElementById('sort').addEventListener('change', (e)=>{ state.sort = e.target.value; applyFilters(); });
-    document.getElementById('perPage').addEventListener('change', (e)=>{ state.perPage = parseInt(e.target.value,10); state.page = 1; applyFilters(); });
-    document.getElementById('prevPage').addEventListener('click', ()=>{ state.page = Math.max(1, state.page-1); applyFilters(); });
-    document.getElementById('nextPage').addEventListener('click', ()=>{ state.page = state.page+1; applyFilters(); });
-    document.getElementById('clearAll').addEventListener('click', ()=>{
-      state.q = '';
-      document.getElementById('q').value = '';
-      for (const k of ['stone','color','shape','clarity','origin','shade','status']) state[k].clear();
-      ['minCt','maxCt','minP','maxP'].forEach(id => document.getElementById(id).value = '');
-      state.minCt = state.maxCt = state.minP = state.maxP = null;
-      state.sort = 'featured'; document.getElementById('sort').value = 'featured';
-      state.page = 1; applyFilters();
+function renderChips(id, items, onClick, labelRenderer){
+  const box = document.getElementById(id); if(!box) return;
+  box.innerHTML = '';
+  items.forEach(val=>{
+    const btn = document.createElement('button');
+    btn.className = 'px-2 py-1 rounded-lg border border-gray-300 text-xs bg-white hover:bg-gray-50 flex items-center gap-1';
+    btn.innerHTML = labelRenderer? labelRenderer(val): val;
+    btn.addEventListener('click', ()=> onClick(val));
+    box.appendChild(btn);
+  });
+}
+
+function renderToolbar(){ computeDynamicRanges(); }
+
+/* Bind toolbar inputs to state */
+(function bindToolbar(){
+  const Q = id => document.getElementById(id);
+  const bindNum = (key,id) => Q(id)?.addEventListener('change', ()=>{ state[key] = parseNumber(Q(id).value); state.page=1; applyFilters(); });
+
+  bindNum('minTotal','priceMin');  bindNum('maxTotal','priceMax');
+  bindNum('minCt','caratMin');     bindNum('maxCt','caratMax');
+
+  Q('qualityMin')?.addEventListener('change', ()=>{ state.qualityMin = parseNumber(Q('qualityMin').value)||1; state.page=1; applyFilters(); });
+  Q('qualityMax')?.addEventListener('change', ()=>{ state.qualityMax = parseNumber(Q('qualityMax').value)||5; state.page=1; applyFilters(); });
+
+  const mapSel = { selOrigin:'origin', selClarity:'clarity', selTreatment:'treatment', selCert:'certificate', selPair:'pair' };
+  Object.entries(mapSel).forEach(([id,key])=>{
+    Q(id)?.addEventListener('change', ()=>{
+      const v = Q(id).value;
+      state[key] = new Set(v ? [v] : []);
+      state.page=1; applyFilters();
     });
-    document.getElementById('refreshBtn').addEventListener('click', ()=> loadData());
+  });
+})();
+</script>
+
 
     // ========= BOOT =========
     feather.replace();
