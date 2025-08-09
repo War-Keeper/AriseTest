@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Gem Catalog • Static + Google Sheets</title>
+  <link rel="icon" href="data:,"><!-- stop favicon 404 -->
 
   <!-- Tailwind (CDN ok for GitHub Pages) -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -66,7 +67,7 @@
   </header>
 
   <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-    <!-- Sidebar Filters (hidden on mobile, shown on lg+) -->
+    <!-- Sidebar Filters (desktop) -->
     <aside class="hidden lg:block lg:col-span-3">
       <div class="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 sticky top-24">
         <div class="flex items-center justify-between mb-2">
@@ -74,26 +75,23 @@
           <button id="clearAll" class="text-xs text-indigo-600 hover:underline">Clear all</button>
         </div>
         <div id="activePills" class="flex flex-wrap gap-2 mb-3"></div>
-        <div id="facets" class="space-y-4"><!-- sidebar facets injected by app.js --></div>
+        <div id="facets" class="space-y-4"></div>
       </div>
     </aside>
 
     <!-- Results + Toolbar -->
     <section class="lg:col-span-9">
       <div class="bg-white rounded-2xl border border-gray-200 p-3 sm:p-4">
-        <!-- Top toolbar (chips + inputs) -->
+        <!-- Top toolbar -->
         <div id="toolbar" class="mb-4 space-y-4">
-          <!-- Gem Type -->
           <div>
             <div class="text-[12px] font-medium mb-2">Gem Type</div>
             <div id="chipStones" class="flex flex-wrap gap-2"></div>
           </div>
-          <!-- Shape -->
           <div>
             <div class="text-[12px] font-medium mb-2">Shape</div>
             <div id="chipShapes" class="flex flex-wrap gap-2"></div>
           </div>
-          <!-- Price / Carat / Quality -->
           <div class="grid md:grid-cols-3 gap-4">
             <div>
               <div class="text-[12px] font-medium">Price (USD)</div>
@@ -113,24 +111,16 @@
               <div class="text-[12px] font-medium">Quality Grade</div>
               <div class="flex items-center gap-2 mt-2">
                 <select id="qualityMin" class="rounded border-gray-300 text-sm">
-                  <option value="1">A</option>
-                  <option value="2">AA</option>
-                  <option value="3">AAA</option>
-                  <option value="4">AAAA</option>
-                  <option value="5">AAAAA</option>
+                  <option value="1">A</option><option value="2">AA</option><option value="3">AAA</option><option value="4">AAAA</option><option value="5">AAAAA</option>
                 </select>
                 <span class="text-gray-400">to</span>
                 <select id="qualityMax" class="rounded border-gray-300 text-sm">
-                  <option value="1">A</option>
-                  <option value="2">AA</option>
-                  <option value="3" selected>AAA</option>
-                  <option value="4">AAAA</option>
-                  <option value="5">AAAAA</option>
+                  <option value="1">A</option><option value="2">AA</option><option value="3" selected>AAA</option><option value="4">AAAA</option><option value="5">AAAAA</option>
                 </select>
               </div>
             </div>
           </div>
-          <!-- Dropdowns -->
+
           <div class="grid md:grid-cols-5 gap-2">
             <select id="selOrigin" class="rounded border-gray-300 text-sm"><option value="">Origin</option></select>
             <select id="selPair" class="rounded border-gray-300 text-sm"><option value="">Single/Pair</option><option>Single</option><option>Pair</option></select>
@@ -140,7 +130,6 @@
           </div>
         </div>
 
-        <!-- Results header -->
         <div class="flex flex-wrap items-center gap-3 mb-3">
           <div class="text-sm text-gray-500"><span id="resultCount">0</span> results</div>
           <div class="ml-auto flex items-center gap-2">
@@ -155,17 +144,13 @@
             </select>
             <label class="text-xs text-gray-500" for="perPage">Per page</label>
             <select id="perPage" class="rounded-lg border-gray-300 text-sm">
-              <option>24</option>
-              <option>48</option>
-              <option>96</option>
+              <option>24</option><option>48</option><option>96</option>
             </select>
           </div>
         </div>
 
-        <!-- Grid -->
         <div id="grid" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4"></div>
 
-        <!-- Pagination -->
         <div class="flex items-center justify-center gap-2 mt-4">
           <button id="prevPage" class="px-3 py-2 text-sm rounded-lg border border-gray-300 disabled:opacity-50">Prev</button>
           <div class="text-sm text-gray-500">Page <span id="page">1</span> / <span id="pages">1</span></div>
@@ -175,18 +160,16 @@
     </section>
   </main>
 
-  <!-- Mobile bottom bar (shows on small screens) -->
+  <!-- Mobile bottom bar -->
   <div class="fixed bottom-0 inset-x-0 z-40 sm:hidden">
     <div class="mx-auto max-w-7xl px-4 pb-4">
       <div class="bg-white/95 backdrop-blur shadow border rounded-2xl p-2 flex items-center justify-center gap-3">
-        <button id="mobileFiltersBtn" class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-gray-300 bg-white text-sm">
-          Filters
-        </button>
+        <button id="mobileFiltersBtn" class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-gray-300 bg-white text-sm">Filters</button>
       </div>
     </div>
   </div>
 
-  <!-- Mobile bottom sheet for filters -->
+  <!-- Mobile bottom sheet -->
   <div id="mobileSheet" class="fixed inset-0 z-50 hidden" aria-modal="true" role="dialog">
     <div class="absolute inset-0 bg-black/40" data-close></div>
     <div class="absolute inset-x-0 bottom-0 bg-white rounded-t-2xl shadow-xl max-h-[85vh] flex flex-col">
@@ -197,7 +180,7 @@
           <button id="mobileClose" class="text-gray-500">Close</button>
         </div>
       </div>
-      <div class="overflow-y-auto p-4 space-y-4" id="facetsMobile"><!-- mobile facets injected by app.js --></div>
+      <div class="overflow-y-auto p-4 space-y-4" id="facetsMobile"></div>
       <div class="p-4 border-t flex gap-2">
         <button id="mobileClear" class="px-3 py-2 rounded-lg border border-gray-300">Clear</button>
         <button id="mobileApply" class="flex-1 px-3 py-2 rounded-lg bg-indigo-600 text-white">Apply</button>
@@ -205,7 +188,7 @@
     </div>
   </div>
 
-  <!-- Card template (with expandable details + media strip) -->
+  <!-- Card template -->
   <template id="cardTpl">
     <article class="card group bg-white rounded-xl border border-gray-200 overflow-hidden" data-card>
       <div class="aspect-square bg-gray-100 relative">
@@ -234,7 +217,6 @@
         </div>
         <div class="text-[11px] text-gray-500"><span data-size></span></div>
 
-        <!-- EXPANDABLE DETAILS -->
         <button type="button" class="mt-2 text-xs text-indigo-600 hover:underline" data-toggle>Details</button>
         <div class="details hidden border-t border-gray-100 mt-2 pt-3 space-y-3" data-details>
           <div class="media-strip" data-media></div>
@@ -256,7 +238,7 @@
     </div>
   </template>
 
-  <!-- Libs + App (order matters) -->
+  <!-- Libs + App -->
   <script src="https://unpkg.com/feather-icons"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="app.js"></script>
