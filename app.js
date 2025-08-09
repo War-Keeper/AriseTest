@@ -75,6 +75,7 @@ const COLS = {
   certificateNumber: ["Certificate Number", "Cert #"],
   treatment: ["Gemstone Treatment", "Treatment"],
   source: ["Gemstone Source", "Source"],
+  media: ["Media", "Media URLs", "Gallery", "Images", "Photos", "Videos", "Media Links"],
 };
 
 /* Color swatches */
@@ -114,8 +115,7 @@ const Q = (id) => document.getElementById(id);
 const normKey = (s) => String(s || "").trim().toLowerCase();
 const byAliases = (row, aliases) => {
   for (const a of aliases) {
-    const key =
-      Object.keys(row).find((k) => normKey(k) === normKey(a)) || null;
+    const key = Object.keys(row).find((k) => normKey(k) === normKey(a)) || null;
     if (key && row[key] != null && row[key] !== "") return row[key];
   }
   return "";
@@ -256,10 +256,21 @@ function mapRow(row) {
     certificateNumber: byAliases(row, COLS.certificateNumber),
     treatment: byAliases(row, COLS.treatment),
     source: byAliases(row, COLS.source),
+    media: (() => {
+      const raw = byAliases(row, COLS.media);
+      const list = (raw ? raw : byAliases(row, COLS.imageUrl))
+        .toString()
+        .split(/[
+,;|]/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      return list.length ? list : [];
+    })(),
   };
   if (o.totalPrice == null && o.caratTotal && o.retailPerCt) {
     o.totalPrice = +(o.caratTotal * o.retailPerCt).toFixed(2);
   }
+  if (!o.media.length && o.imageUrl) o.media = [o.imageUrl];
   o.isPair = (o.pieces || 1) >= 2 ? "Pair" : "Single";
   o.qualityScore = calcQuality(o);
   o.qualityLabel = gradeLabel(o.qualityScore);
@@ -269,7 +280,7 @@ function mapRow(row) {
 async function loadData() {
   showSkeletons();
   try {
-    // Link to CSV in header for sanity-check
+    // Link to CSV in header
     const firstURL = SHEET_SOURCES[0]?.url || "#";
     const csvLink = Q("csvLink");
     if (csvLink) csvLink.href = firstURL;
@@ -292,7 +303,7 @@ async function loadData() {
     });
 
     buildFacets();
-    renderToolbar(); // fill toolbar controls
+    renderToolbar();
     readURL();
     applyFilters();
   } catch (err) {
@@ -312,35 +323,17 @@ function uniq(list) {
   );
 }
 
-function buildFacets() {
-  FACETS = {
-    stone: uniq(ALL.map((x) => x.stone)),
-    color: uniq(ALL.map((x) => x.color)),
-    shape: uniq(ALL.map((x) => x.shape)),
-    clarity: uniq(ALL.map((x) => x.clarity)),
-    origin: uniq(ALL.map((x) => x.origin)),
-    shade: uniq(ALL.map((x) => x.shade)),
-    status: uniq(ALL.map((x) => x.status)),
-    certificate: uniq(ALL.map((x) => x.certificate)),
-    treatment: uniq(ALL.map((x) => x.treatment)),
-    pair: uniq(ALL.map((x) => x.isPair)),
-  };
-
-  renderFacets(); // sidebar pills, if present
-}
-
 function facetSection(id, title, items, renderLabel) {
   const wrap = document.createElement("div");
   wrap.className = "border-t border-gray-200 pt-3";
-  wrap.innerHTML = `
-    <details open class="group">
-      <summary class="cursor-pointer list-none flex items-center justify-between text-sm font-medium text-gray-900 select-none">
-        <span>${title}</span>
-        <span class="text-gray-400 group-open:rotate-180 transition"><i data-feather="chevron-down"></i></span>
-      </summary>
-      <div class="mt-2 flex flex-wrap gap-2" id="facet-${id}"></div>
-    </details>`;
-  const box = wrap.querySelector(`#facet-${id}`);
+  const details = document.createElement("details");
+  details.open = true;
+  details.className = "group";
+  const summary = document.createElement("summary");
+  summary.className = "cursor-pointer list-none flex items-center justify-between text-sm font-medium text-gray-900 select-none";
+  summary.innerHTML = `<span>${title}</span> <span class=\"text-gray-400 group-open:rotate-180 transition\"><i data-feather=\"chevron-down\"></i></span>`;
+  const box = document.createElement("div");
+  box.className = "mt-2 flex flex-wrap gap-2";
   items.forEach((val) => {
     const btn = document.createElement("button");
     btn.className =
@@ -355,11 +348,14 @@ function facetSection(id, title, items, renderLabel) {
     else btn.textContent = val;
     box.appendChild(btn);
   });
+  details.appendChild(summary);
+  details.appendChild(box);
+  wrap.appendChild(details);
   return wrap;
 }
 
-function renderFacets() {
-  const facetsEl = Q("facets");
+function renderFacetsInto(containerId, suffix = "") {
+  const facetsEl = Q(containerId);
   if (!facetsEl) return;
   facetsEl.innerHTML = "";
 
@@ -386,41 +382,63 @@ function renderFacets() {
   facetsEl.appendChild(facetSection("origin", "Origin", FACETS.origin));
   facetsEl.appendChild(facetSection("shade", "Shade", FACETS.shade));
   facetsEl.appendChild(facetSection("status", "Status", FACETS.status));
-  facetsEl.appendChild(
-    facetSection("certificate", "Certificate", FACETS.certificate)
-  );
-  facetsEl.appendChild(
-    facetSection("treatment", "Enhancement", FACETS.treatment)
-  );
+  facetsEl.appendChild(facetSection("certificate", "Certificate", FACETS.certificate));
+  facetsEl.appendChild(facetSection("treatment", "Enhancement", FACETS.treatment));
   facetsEl.appendChild(facetSection("pair", "Single/Pair", FACETS.pair));
 
-  // Sidebar ranges, if you use them (optional)
+  // Range filters
   const rangeWrap = document.createElement("div");
   rangeWrap.className = "border-t border-gray-200 pt-3 space-y-3";
   rangeWrap.innerHTML = `
     <div>
-      <div class="text-sm font-medium">Carat</div>
-      <div class="mt-2 grid grid-cols-2 gap-2">
-        <input id="minCt" type="number" step="0.01" placeholder="Min" class="rounded-lg border-gray-300" />
-        <input id="maxCt" type="number" step="0.01" placeholder="Max" class="rounded-lg border-gray-300" />
+      <div class=\"text-sm font-medium\">Carat</div>
+      <div class=\"mt-2 grid grid-cols-2 gap-2\">
+        <input id=\"minCt${suffix}\" type=\"number\" step=\"0.01\" placeholder=\"Min\" class=\"rounded-lg border-gray-300\" />
+        <input id=\"maxCt${suffix}\" type=\"number\" step=\"0.01\" placeholder=\"Max\" class=\"rounded-lg border-gray-300\" />
       </div>
     </div>
     <div>
-      <div class="text-sm font-medium">Total Price ($)</div>
-      <div class="mt-2 grid grid-cols-2 gap-2">
-        <input id="minTotal" type="number" step="1" placeholder="Min" class="rounded-lg border-gray-300" />
-        <input id="maxTotal" type="number" step="1" placeholder="Max" class="rounded-lg border-gray-300" />
+      <div class=\"text-sm font-medium\">Total Price ($)</div>
+      <div class=\"mt-2 grid grid-cols-2 gap-2\">
+        <input id=\"minTotal${suffix}\" type=\"number\" step=\"1\" placeholder=\"Min\" class=\"rounded-lg border-gray-300\" />
+        <input id=\"maxTotal${suffix}\" type=\"number\" step=\"1\" placeholder=\"Max\" class=\"rounded-lg border-gray-300\" />
       </div>
     </div>`;
   facetsEl.appendChild(rangeWrap);
 
-  ["minCt", "maxCt", "minTotal", "maxTotal"].forEach((id) => {
-    Q(id)?.addEventListener("change", () => {
-      state[id] = parseNumber(Q(id).value);
-      state.page = 1;
-      applyFilters();
-    });
+  // Listeners for this instance
+  ["minCt","maxCt","minTotal","maxTotal"].forEach((k) => {
+    const el = Q(k + suffix);
+    if (el) el.addEventListener("change", () => { state[k] = parseNumber(el.value); state.page=1; applyFilters(); });
   });
+
+  // Placeholder values based on data
+  const carats = ALL.map((x) => x.caratTotal).filter((v) => v != null);
+  const totals = ALL.map((x) => x.totalPrice).filter((v) => v != null);
+  const setIfEmpty = (id, val) => { const el = Q(id + suffix); if (el && !el.value) el.value = String(val); };
+  if (carats.length) { setIfEmpty("minCt", Math.min(...carats).toFixed(2)); setIfEmpty("maxCt", Math.max(...carats).toFixed(2)); }
+  if (totals.length) { setIfEmpty("minTotal", Math.floor(Math.min(...totals))); setIfEmpty("maxTotal", Math.ceil(Math.max(...totals))); }
+
+  try { window.feather && window.feather.replace(); } catch(_) {}
+}
+
+function buildFacets() {
+  FACETS = {
+    stone: uniq(ALL.map((x) => x.stone)),
+    color: uniq(ALL.map((x) => x.color)),
+    shape: uniq(ALL.map((x) => x.shape)),
+    clarity: uniq(ALL.map((x) => x.clarity)),
+    origin: uniq(ALL.map((x) => x.origin)),
+    shade: uniq(ALL.map((x) => x.shade)),
+    status: uniq(ALL.map((x) => x.status)),
+    certificate: uniq(ALL.map((x) => x.certificate)),
+    treatment: uniq(ALL.map((x) => x.treatment)),
+    pair: uniq(ALL.map((x) => x.isPair)),
+  };
+
+  // Render both desktop sidebar and mobile sheet
+  renderFacetsInto("facets", "");
+  renderFacetsInto("facetsMobile", "M");
 }
 
 /* Toolbar (chips + inputs like screenshot) */
@@ -429,9 +447,7 @@ function renderToolbar() {
   const fill = (id, label, items) => {
     const el = Q(id);
     if (!el) return;
-    el.innerHTML =
-      `<option value="">${label}</option>` +
-      items.map((o) => `<option>${o}</option>`).join("");
+    el.innerHTML = `<option value=\"\">${label}</option>` + items.map((o) => `<option>${o}</option>`).join("");
   };
   fill("selOrigin", "Origin", FACETS.origin);
   fill("selClarity", "Clarity", FACETS.clarity);
@@ -439,38 +455,15 @@ function renderToolbar() {
   fill("selTreatment", "Enhancement", FACETS.treatment);
 
   // Create chips
-  renderChips(
-    "chipStones",
-    FACETS.stone,
-    (val) => {
-      toggleSet(state.stone, val);
-      state.page = 1;
-      applyFilters();
-    },
-    (val) =>
-      `<span class="swatch mr-1" style="background:${colorHex(val, val)}"></span>${val}`
-  );
-  renderChips("chipShapes", FACETS.shape, (val) => {
-    toggleSet(state.shape, val);
-    state.page = 1;
-    applyFilters();
-  });
+  renderChips("chipStones", FACETS.stone, (val) => { toggleSet(state.stone, val); state.page = 1; applyFilters(); }, (val) => `<span class=\"swatch mr-1\" style=\"background:${colorHex(val, val)}\"></span>${val}`);
+  renderChips("chipShapes", FACETS.shape, (val) => { toggleSet(state.shape, val); state.page = 1; applyFilters(); });
 
-  // Range placeholders based on data
+  // Range placeholders based on data for top toolbar inputs
   const carats = ALL.map((x) => x.caratTotal).filter((v) => v != null);
   const totals = ALL.map((x) => x.totalPrice).filter((v) => v != null);
-  const setIfEmpty = (id, val) => {
-    const el = Q(id);
-    if (el && !el.value) el.value = String(val);
-  };
-  if (carats.length) {
-    setIfEmpty("caratMin", Math.min(...carats).toFixed(2));
-    setIfEmpty("caratMax", Math.max(...carats).toFixed(2));
-  }
-  if (totals.length) {
-    setIfEmpty("priceMin", Math.floor(Math.min(...totals)));
-    setIfEmpty("priceMax", Math.ceil(Math.max(...totals)));
-  }
+  const setIfEmpty = (id, val) => { const el = Q(id); if (el && !el.value) el.value = String(val); };
+  if (carats.length) { setIfEmpty("caratMin", Math.min(...carats).toFixed(2)); setIfEmpty("caratMax", Math.max(...carats).toFixed(2)); }
+  if (totals.length) { setIfEmpty("priceMin", Math.floor(Math.min(...totals))); setIfEmpty("priceMax", Math.ceil(Math.max(...totals))); }
 }
 
 function renderChips(id, items, onClick, labelRenderer) {
@@ -479,35 +472,77 @@ function renderChips(id, items, onClick, labelRenderer) {
   box.innerHTML = "";
   items.forEach((val) => {
     const btn = document.createElement("button");
-    btn.className =
-      "px-2 py-1 rounded-lg border border-gray-300 text-xs bg-white hover:bg-gray-50 flex items-center gap-1";
+    btn.className = "px-2 py-1 rounded-lg border border-gray-300 text-xs bg-white hover:bg-gray-50 flex items-center gap-1";
     btn.innerHTML = labelRenderer ? labelRenderer(val) : val;
     btn.addEventListener("click", () => onClick(val));
     box.appendChild(btn);
   });
 }
 
-/* ----- FILTERING & SORT ----- */
-function toggleSet(set, val) {
-  set.has(val) ? set.delete(val) : set.add(val);
+/* ----- DETAILS (expand + media strip) ----- */
+const isVideo = (u) => /\.(mp4|webm|ogg|mov)$/i.test(u || "");
+
+function buildDetails(cardEl, x) {
+  const mediaBox = cardEl.querySelector('[data-media]');
+  const specsBox = cardEl.querySelector('[data-specs]');
+  if (mediaBox && !mediaBox.childElementCount) {
+    x.media.forEach((url) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'media-item aspect-square';
+      if (isVideo(url)) {
+        const v = document.createElement('video');
+        v.src = url; v.controls = true; v.playsInline = true; v.preload = 'metadata';
+        wrap.appendChild(v);
+      } else {
+        const img = document.createElement('img');
+        img.src = url; img.alt = x.stone || 'Media';
+        wrap.appendChild(img);
+      }
+      mediaBox.appendChild(wrap);
+    });
+  }
+  if (specsBox && !specsBox.childElementCount) {
+    const rows = [
+      ['Item No', x.originalId], ['Product #', x.stockId],
+      ['Type', x.stone], ['Source', x.source],
+      ['Color', x.color], ['Intensity', x.shade],
+      ['Clarity', x.clarity], ['Shape', x.shape],
+      ['Carat', fmtCarat(x.caratTotal)], ['Pieces', x.pieces || 1],
+      ['Origin', x.origin], ['Treatment', x.treatment],
+      ['Certificate', x.certificate], ['Cert #', x.certificateNumber],
+      ['Size', [x.sizeMm, x.sizeRange].filter(Boolean).join(' | ')],
+      ['$/ct', fmtMoney(x.retailPerCt)], ['Total', fmtMoney(x.totalPrice)],
+      ['Status', x.status]
+    ];
+    rows.forEach(([k, v]) => {
+      const d = document.createElement('div');
+      d.innerHTML = `<div class=\"text-gray-400\">${k}</div><div class=\"font-medium\">${v || '—'}</div>`;
+      specsBox.appendChild(d);
+    });
+  }
 }
+
+function toggleDetails(cardEl, data) {
+  const box = cardEl.querySelector('[data-details]');
+  if (!box) return;
+  const isOpen = !box.classList.contains('hidden');
+  if (isOpen) { box.classList.add('hidden'); }
+  else { buildDetails(cardEl, data); box.classList.remove('hidden'); }
+}
+
+/* ----- FILTERING & SORT ----- */
+function toggleSet(set, val) { set.has(val) ? set.delete(val) : set.add(val); }
 function matchesText(x, q) {
   if (!q) return true;
   const hay = `${x.stockId} ${x.originalId} ${x.stone} ${x.color} ${x.shape} ${x.clarity} ${x.origin} ${x.shade}`.toLowerCase();
   return hay.includes(q.toLowerCase());
 }
-function inSetOrAny(set, val) {
-  return set.size === 0 || set.has(val);
-}
+function inSetOrAny(set, val) { return set.size === 0 || set.has(val); }
 function passesRanges(x) {
-  if (state.minCt != null && !(x.caratTotal != null && x.caratTotal >= state.minCt))
-    return false;
-  if (state.maxCt != null && !(x.caratTotal != null && x.caratTotal <= state.maxCt))
-    return false;
-  if (state.minTotal != null && !(x.totalPrice != null && x.totalPrice >= state.minTotal))
-    return false;
-  if (state.maxTotal != null && !(x.totalPrice != null && x.totalPrice <= state.maxTotal))
-    return false;
+  if (state.minCt != null && !(x.caratTotal != null && x.caratTotal >= state.minCt)) return false;
+  if (state.maxCt != null && !(x.caratTotal != null && x.caratTotal <= state.maxCt)) return false;
+  if (state.minTotal != null && !(x.totalPrice != null && x.totalPrice >= state.minTotal)) return false;
+  if (state.maxTotal != null && !(x.totalPrice != null && x.totalPrice <= state.maxTotal)) return false;
   if (state.qualityMin != null && !(x.qualityScore >= state.qualityMin)) return false;
   if (state.qualityMax != null && !(x.qualityScore <= state.qualityMax)) return false;
   return true;
@@ -516,43 +551,28 @@ function sortView(list) {
   const s = state.sort;
   const copy = [...list];
   switch (s) {
-    case "priceAsc":
-      return copy.sort(
-        (a, b) => (a.retailPerCt ?? Infinity) - (b.retailPerCt ?? Infinity)
-      );
-    case "priceDesc":
-      return copy.sort(
-        (a, b) => (b.retailPerCt ?? -Infinity) - (a.retailPerCt ?? -Infinity)
-      );
-    case "caratAsc":
-      return copy.sort(
-        (a, b) => (a.caratTotal ?? Infinity) - (b.caratTotal ?? Infinity)
-      );
-    case "caratDesc":
-      return copy.sort(
-        (a, b) => (b.caratTotal ?? -Infinity) - (a.caratTotal ?? -Infinity)
-      );
-    case "newest":
-      return copy.sort((a, b) => (b.stockId || "").localeCompare(a.stockId || ""));
-    default:
-      return copy; // featured
+    case "priceAsc": return copy.sort((a,b) => (a.retailPerCt ?? Infinity) - (b.retailPerCt ?? Infinity));
+    case "priceDesc": return copy.sort((a,b) => (b.retailPerCt ?? -Infinity) - (a.retailPerCt ?? -Infinity));
+    case "caratAsc": return copy.sort((a,b) => (a.caratTotal ?? Infinity) - (b.caratTotal ?? Infinity));
+    case "caratDesc": return copy.sort((a,b) => (b.caratTotal ?? -Infinity) - (a.caratTotal ?? -Infinity));
+    case "newest": return copy.sort((a,b) => (b.stockId || '').localeCompare(a.stockId || ''));
+    default: return copy; // featured
   }
 }
 function applyFilters() {
-  VIEW = ALL.filter(
-    (x) =>
-      matchesText(x, state.q) &&
-      inSetOrAny(state.stone, x.stone) &&
-      inSetOrAny(state.color, x.color) &&
-      inSetOrAny(state.shape, x.shape) &&
-      inSetOrAny(state.clarity, x.clarity) &&
-      inSetOrAny(state.origin, x.origin) &&
-      inSetOrAny(state.shade, x.shade) &&
-      inSetOrAny(state.status, x.status) &&
-      inSetOrAny(state.certificate, x.certificate) &&
-      inSetOrAny(state.treatment, x.treatment) &&
-      inSetOrAny(state.pair, x.isPair) &&
-      passesRanges(x)
+  VIEW = ALL.filter((x) =>
+    matchesText(x, state.q)
+    && inSetOrAny(state.stone, x.stone)
+    && inSetOrAny(state.color, x.color)
+    && inSetOrAny(state.shape, x.shape)
+    && inSetOrAny(state.clarity, x.clarity)
+    && inSetOrAny(state.origin, x.origin)
+    && inSetOrAny(state.shade, x.shade)
+    && inSetOrAny(state.status, x.status)
+    && inSetOrAny(state.certificate, x.certificate)
+    && inSetOrAny(state.treatment, x.treatment)
+    && inSetOrAny(state.pair, x.isPair)
+    && passesRanges(x)
   );
 
   VIEW = sortView(VIEW);
@@ -566,18 +586,7 @@ function applyFilters() {
 function writeURL() {
   const params = new URLSearchParams();
   if (state.q) params.set("q", state.q);
-  for (const k of [
-    "stone",
-    "color",
-    "shape",
-    "clarity",
-    "origin",
-    "shade",
-    "status",
-    "certificate",
-    "treatment",
-    "pair",
-  ]) {
+  for (const k of ["stone","color","shape","clarity","origin","shade","status","certificate","treatment","pair"]) {
     if (state[k].size) params.set(k, [...state[k]].join(","));
   }
   if (state.minCt != null) params.set("minCt", state.minCt);
@@ -597,18 +606,7 @@ function readURL() {
   state.q = params.get("q") || "";
   Q("q") && (Q("q").value = state.q);
 
-  for (const k of [
-    "stone",
-    "color",
-    "shape",
-    "clarity",
-    "origin",
-    "shade",
-    "status",
-    "certificate",
-    "treatment",
-    "pair",
-  ]) {
+  for (const k of ["stone","color","shape","clarity","origin","shade","status","certificate","treatment","pair"]) {
     const v = params.get(k);
     state[k] = new Set(v ? v.split(",") : []);
   }
@@ -636,69 +634,25 @@ function renderPills() {
 
   const addPill = (label, val, unset) => {
     const span = document.createElement("span");
-    span.className =
-      "pill inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs border border-gray-300 bg-white";
-    span.innerHTML = `<span>${label}: <b>${val}</b></span> <button class="text-gray-400 hover:text-gray-600" aria-label="Remove">×</button>`;
+    span.className = "pill inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs border border-gray-300 bg-white";
+    span.innerHTML = `<span>${label}: <b>${val}</b></span> <button class=\"text-gray-400 hover:text-gray-600\" aria-label=\"Remove\">×</button>`;
     span.querySelector("button").addEventListener("click", unset);
     box.appendChild(span);
   };
 
   if (state.q)
-    addPill("Search", state.q, () => {
-      state.q = "";
-      Q("q") && (Q("q").value = "");
-      applyFilters();
-    });
+    addPill("Search", state.q, () => { state.q = ""; Q("q") && (Q("q").value = ""); applyFilters(); });
 
-  for (const k of [
-    "stone",
-    "color",
-    "shape",
-    "clarity",
-    "origin",
-    "shade",
-    "status",
-    "certificate",
-    "treatment",
-    "pair",
-  ]) {
+  for (const k of ["stone","color","shape","clarity","origin","shade","status","certificate","treatment","pair"]) {
     for (const val of state[k]) {
-      addPill(k[0].toUpperCase() + k.slice(1), val, () => {
-        state[k].delete(val);
-        applyFilters();
-      });
+      addPill(k[0].toUpperCase() + k.slice(1), val, () => { state[k].delete(val); applyFilters(); });
     }
   }
 
-  if (state.minCt != null)
-    addPill("Min ct", state.minCt, () => {
-      state.minCt = null;
-      Q("minCt") && (Q("minCt").value = "");
-      Q("caratMin") && (Q("caratMin").value = "");
-      applyFilters();
-    });
-  if (state.maxCt != null)
-    addPill("Max ct", state.maxCt, () => {
-      state.maxCt = null;
-      Q("maxCt") && (Q("maxCt").value = "");
-      Q("caratMax") && (Q("caratMax").value = "");
-      applyFilters();
-    });
-
-  if (state.minTotal != null)
-    addPill("Min $", state.minTotal, () => {
-      state.minTotal = null;
-      Q("minTotal") && (Q("minTotal").value = "");
-      Q("priceMin") && (Q("priceMin").value = "");
-      applyFilters();
-    });
-  if (state.maxTotal != null)
-    addPill("Max $", state.maxTotal, () => {
-      state.maxTotal = null;
-      Q("maxTotal") && (Q("maxTotal").value = "");
-      Q("priceMax") && (Q("priceMax").value = "");
-      applyFilters();
-    });
+  if (state.minCt != null) addPill("Min ct", state.minCt, () => { state.minCt = null; ["minCt","caratMin","minCtM"].forEach(id=>Q(id)&&(Q(id).value="")); applyFilters(); });
+  if (state.maxCt != null) addPill("Max ct", state.maxCt, () => { state.maxCt = null; ["maxCt","caratMax","maxCtM"].forEach(id=>Q(id)&&(Q(id).value="")); applyFilters(); });
+  if (state.minTotal != null) addPill("Min $", state.minTotal, () => { state.minTotal = null; ["minTotal","priceMin","minTotalM"].forEach(id=>Q(id)&&(Q(id).value="")); applyFilters(); });
+  if (state.maxTotal != null) addPill("Max $", state.maxTotal, () => { state.maxTotal = null; ["maxTotal","priceMax","maxTotalM"].forEach(id=>Q(id)&&(Q(id).value="")); applyFilters(); });
 }
 
 function renderGrid() {
@@ -720,201 +674,93 @@ function renderGrid() {
   const end = start + state.perPage;
   const slice = VIEW.slice(start, end);
 
-  const tpl = Q("cardTpl")?.content;
+  const tpl = document.getElementById('cardTpl')?.content;
 
   for (const x of slice) {
-    let node;
+    let frag;
     if (tpl) {
-      node = tpl.cloneNode(true);
-      const img = node.querySelector("img");
-      if (img) {
-        img.src =
-          x.imageUrl ||
-          `https://placehold.co/600x600?text=${encodeURIComponent(
-            x.stone || "Gem"
-          )}`;
-        img.alt = `${x.stone || ""} ${x.color || ""} ${x.shape || ""}`.trim();
-      }
-      node.querySelector('[data-badge="stone"]') &&
-        (node.querySelector('[data-badge="stone"]').textContent = x.stone || "");
-      const bc = node.querySelector('[data-badge="color"]');
-      if (bc) {
-        bc.querySelector(".swatch").style.background = colorHex(x.stone, x.color);
-        bc.querySelector("[data-badge-label]").textContent = x.color || "—";
-      }
-      const a = node.querySelector("[data-stock]");
-      if (a) {
-        a.textContent = x.stockId || x.originalId || "—";
-        a.href = x.imageUrl || "#";
-      }
-      node.querySelector("[data-retail]") &&
-        (node.querySelector("[data-retail]").textContent =
-          fmtMoney(x.retailPerCt) + " / ct");
-      node.querySelector("[data-carat]") &&
-        (node.querySelector("[data-carat]").textContent = fmtCarat(x.caratTotal));
-      node.querySelector("[data-shape]") &&
-        (node.querySelector("[data-shape]").textContent = x.shape || "—");
-      node.querySelector("[data-clarity]") &&
-        (node.querySelector("[data-clarity]").textContent = x.clarity || "—");
-      node.querySelector("[data-origin]") &&
-        (node.querySelector("[data-origin]").textContent =
-          [x.origin, x.shade].filter(Boolean).join(" · "));
-      const sizeBits = [x.sizeMm, x.sizeRange].filter(Boolean).join(" | ");
-      node.querySelector("[data-size]") &&
-        (node.querySelector("[data-size]").textContent = sizeBits);
-      grid.appendChild(node);
-    } else {
-      // Simple fallback card if <template> not present
-      const card = document.createElement("div");
-      card.className =
-        "card bg-white rounded-xl border border-gray-200 overflow-hidden p-3";
-      card.innerHTML = `
-        <div class="text-sm font-medium">${x.stockId || "—"}</div>
-        <div class="text-xs text-gray-600">${x.stone || ""} · ${
-        x.color || ""
-      } · ${x.shape || ""}</div>
-        <div class="text-xs text-gray-500">${fmtCarat(x.caratTotal)} • ${
-        x.origin || ""
-      }</div>
-        <div class="text-sm">${fmtMoney(x.retailPerCt)} / ct</div>`;
-      grid.appendChild(card);
+      frag = tpl.cloneNode(true);
+      const card = frag.querySelector('[data-card]');
+
+      // thumbnail
+      const img = frag.querySelector('img');
+      const firstMedia = (x.media && x.media[0]) || x.imageUrl;
+      img.src = firstMedia || `https://placehold.co/600x600?text=${encodeURIComponent(x.stone || 'Gem')}`;
+      img.alt = `${x.stone || ''} ${x.color || ''} ${x.shape || ''}`.trim();
+
+      // badges/title/prices/meta
+      frag.querySelector('[data-badge="stone"]').textContent = x.stone || '';
+      const bc = frag.querySelector('[data-badge="color"]');
+      bc.querySelector('.swatch').style.background = colorHex(x.stone, x.color);
+      bc.querySelector('[data-badge-label]').textContent = x.color || '—';
+      const a = frag.querySelector('[data-stock]');
+      a.textContent = x.stockId || x.originalId || '—';
+      a.href = firstMedia || '#';
+      frag.querySelector('[data-retail]').textContent = fmtMoney(x.retailPerCt) + ' / ct';
+      frag.querySelector('[data-carat]').textContent = fmtCarat(x.caratTotal);
+      frag.querySelector('[data-shape]').textContent = x.shape || '—';
+      frag.querySelector('[data-clarity]').textContent = x.clarity || '—';
+      frag.querySelector('[data-origin]').textContent = [x.origin, x.shade].filter(Boolean).join(' · ');
+      frag.querySelector('[data-size]').textContent = [x.sizeMm, x.sizeRange].filter(Boolean).join(' | ');
+
+      // expand/collapse
+      card.addEventListener('click', (e)=>{ if (e.target.closest('a')) return; toggleDetails(card, x); });
+      frag.querySelector('[data-toggle]').addEventListener('click', (e)=>{ e.stopPropagation(); toggleDetails(card, x); });
+
+      grid.appendChild(frag);
     }
   }
 
   if (slice.length === 0) {
     const empty = document.createElement("div");
     empty.className = "col-span-full text-center py-12 text-gray-500";
-    empty.innerHTML =
-      '<div class="text-lg font-medium">No matches</div><div class="text-sm">Try removing a filter or broadening your ranges.</div>';
+    empty.innerHTML = '<div class="text-lg font-medium">No matches</div><div class="text-sm">Try removing a filter or broadening your ranges.</div>';
     grid.appendChild(empty);
   }
 }
 
 /* ----- EVENTS (top bar & misc) ----- */
-Q("q")?.addEventListener("input", (e) => {
-  state.q = e.target.value;
-  state.page = 1;
-  applyFilters();
-});
-Q("sort")?.addEventListener("change", (e) => {
-  state.sort = e.target.value;
-  applyFilters();
-});
-Q("perPage")?.addEventListener("change", (e) => {
-  state.perPage = parseInt(e.target.value, 10);
-  state.page = 1;
-  applyFilters();
-});
-Q("prevPage")?.addEventListener("click", () => {
-  state.page = Math.max(1, state.page - 1);
-  applyFilters();
-});
-Q("nextPage")?.addEventListener("click", () => {
-  state.page = state.page + 1;
-  applyFilters();
-});
+Q("q")?.addEventListener("input", (e) => { state.q = e.target.value; state.page = 1; applyFilters(); });
+Q("sort")?.addEventListener("change", (e) => { state.sort = e.target.value; applyFilters(); });
+Q("perPage")?.addEventListener("change", (e) => { state.perPage = parseInt(e.target.value, 10); state.page = 1; applyFilters(); });
+Q("prevPage")?.addEventListener("click", () => { state.page = Math.max(1, state.page - 1); applyFilters(); });
+Q("nextPage")?.addEventListener("click", () => { state.page = state.page + 1; applyFilters(); });
 Q("clearAll")?.addEventListener("click", () => {
-  state.q = "";
-  Q("q") && (Q("q").value = "");
-  for (const k of [
-    "stone",
-    "color",
-    "shape",
-    "clarity",
-    "origin",
-    "shade",
-    "status",
-    "certificate",
-    "treatment",
-    "pair",
-  ])
-    state[k].clear();
-  ["minCt", "maxCt", "minTotal", "maxTotal"].forEach(
-    (id) => Q(id) && (Q(id).value = "")
-  );
-  ["caratMin", "caratMax", "priceMin", "priceMax"].forEach(
-    (id) => Q(id) && (Q(id).value = "")
-  );
+  state.q = ""; Q("q") && (Q("q").value = "");
+  for (const k of ["stone","color","shape","clarity","origin","shade","status","certificate","treatment","pair"]) state[k].clear();
+  ["minCt","maxCt","minTotal","maxTotal","caratMin","caratMax","priceMin","priceMax","minCtM","maxCtM","minTotalM","maxTotalM"].forEach(id=>Q(id)&&(Q(id).value=""));
   state.minCt = state.maxCt = state.minTotal = state.maxTotal = null;
-  state.qualityMin = 1;
-  state.qualityMax = 5;
-  state.sort = "featured";
+  state.qualityMin = 1; state.qualityMax = 5; state.sort = "featured";
   Q("sort") && (Q("sort").value = "featured");
-  state.page = 1;
-  applyFilters();
+  state.page = 1; applyFilters();
 });
 Q("refreshBtn")?.addEventListener("click", () => loadData());
 
 /* Toolbar bindings */
-const bind = (id, fn) => {
-  const el = Q(id);
-  if (el) el.addEventListener("change", fn);
-};
-bind("priceMin", () => {
-  state.minTotal = parseNumber(Q("priceMin").value);
-  state.page = 1;
-  applyFilters();
-});
-bind("priceMax", () => {
-  state.maxTotal = parseNumber(Q("priceMax").value);
-  state.page = 1;
-  applyFilters();
-});
-bind("caratMin", () => {
-  state.minCt = parseNumber(Q("caratMin").value);
-  state.page = 1;
-  applyFilters();
-});
-bind("caratMax", () => {
-  state.maxCt = parseNumber(Q("caratMax").value);
-  state.page = 1;
-  applyFilters();
-});
-bind("qualityMin", () => {
-  state.qualityMin = parseNumber(Q("qualityMin").value) || 1;
-  state.page = 1;
-  applyFilters();
-});
-bind("qualityMax", () => {
-  state.qualityMax = parseNumber(Q("qualityMax").value) || 5;
-  state.page = 1;
-  applyFilters();
-});
-bind("selOrigin", () => {
-  const v = Q("selOrigin").value;
-  state.origin = new Set(v ? [v] : []);
-  state.page = 1;
-  applyFilters();
-});
-bind("selClarity", () => {
-  const v = Q("selClarity").value;
-  state.clarity = new Set(v ? [v] : []);
-  state.page = 1;
-  applyFilters();
-});
-bind("selTreatment", () => {
-  const v = Q("selTreatment").value;
-  state.treatment = new Set(v ? [v] : []);
-  state.page = 1;
-  applyFilters();
-});
-bind("selCert", () => {
-  const v = Q("selCert").value;
-  state.certificate = new Set(v ? [v] : []);
-  state.page = 1;
-  applyFilters();
-});
-bind("selPair", () => {
-  const v = Q("selPair").value;
-  state.pair = new Set(v ? [v] : []);
-  state.page = 1;
-  applyFilters();
-});
+const bind = (id, fn) => { const el = Q(id); if (el) el.addEventListener("change", fn); };
+bind("priceMin", () => { state.minTotal = parseNumber(Q("priceMin").value); state.page = 1; applyFilters(); });
+bind("priceMax", () => { state.maxTotal = parseNumber(Q("priceMax").value); state.page = 1; applyFilters(); });
+bind("caratMin", () => { state.minCt = parseNumber(Q("caratMin").value); state.page = 1; applyFilters(); });
+bind("caratMax", () => { state.maxCt = parseNumber(Q("caratMax").value); state.page = 1; applyFilters(); });
+bind("qualityMin", () => { state.qualityMin = parseNumber(Q("qualityMin").value) || 1; state.page = 1; applyFilters(); });
+bind("qualityMax", () => { state.qualityMax = parseNumber(Q("qualityMax").value) || 5; state.page = 1; applyFilters(); });
+bind("selOrigin", () => { const v = Q("selOrigin").value; state.origin = new Set(v ? [v] : []); state.page = 1; applyFilters(); });
+bind("selClarity", () => { const v = Q("selClarity").value; state.clarity = new Set(v ? [v] : []); state.page = 1; applyFilters(); });
+bind("selTreatment", () => { const v = Q("selTreatment").value; state.treatment = new Set(v ? [v] : []); state.page = 1; applyFilters(); });
+bind("selCert", () => { const v = Q("selCert").value; state.certificate = new Set(v ? [v] : []); state.page = 1; applyFilters(); });
+bind("selPair", () => { const v = Q("selPair").value; state.pair = new Set(v ? [v] : []); state.page = 1; applyFilters(); });
+
+/* Mobile bottom sheet controls */
+function openSheet(){ const sh = Q('mobileSheet'); if (!sh) return; sh.classList.remove('hidden'); document.body.classList.add('overflow-hidden'); }
+function closeSheet(){ const sh = Q('mobileSheet'); if (!sh) return; sh.classList.add('hidden'); document.body.classList.remove('overflow-hidden'); }
+Q('mobileFiltersBtn')?.addEventListener('click', openSheet);
+Q('mobileClose')?.addEventListener('click', closeSheet);
+Q('mobileSheet')?.querySelector('[data-close]')?.addEventListener('click', closeSheet);
+Q('mobileApply')?.addEventListener('click', ()=>{ closeSheet(); });
+Q('mobileClear')?.addEventListener('click', ()=>{ Q('clearAll')?.click(); });
 
 /* ----- BOOT ----- */
 (function boot() {
-  try {
-    window.feather && window.feather.replace();
-  } catch (_) {}
+  try { window.feather && window.feather.replace(); } catch (_) {}
   loadData();
 })();
