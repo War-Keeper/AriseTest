@@ -8,7 +8,6 @@
   <!-- Tailwind (CDN ok for GitHub Pages) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Basic polish -->
   <style>
     /* Scrollbar */
     ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -28,6 +27,13 @@
     /* Cards */
     .card { transition: all .2s ease; }
     .card:hover { box-shadow: 0 8px 24px rgba(17,24,39,.08); transform: translateY(-2px); }
+
+    /* horizontal media strip */
+    .media-strip{display:flex;gap:.5rem;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
+    .media-strip::-webkit-scrollbar{height:8px}
+    .media-strip::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:8px}
+    .media-item{flex:0 0 100%;scroll-snap-align:center;border-radius:.75rem;overflow:hidden;background:#f3f4f6}
+    .media-item > img,.media-item > video{width:100%;height:100%;object-fit:cover;display:block}
   </style>
 </head>
 <body class="bg-gray-50 text-gray-900">
@@ -47,7 +53,6 @@
         <div class="relative">
           <input id="q" type="search" placeholder="Search stock ID, shape, origin, etc…" class="w-full rounded-xl border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 pl-10" />
           <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-            <!-- feather icon renders later -->
             <svg width="16" height="16"><use href="#"></use></svg>
           </div>
         </div>
@@ -61,22 +66,22 @@
   </header>
 
   <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-    <!-- Sidebar Filters -->
-    <aside class="lg:col-span-3">
+    <!-- Sidebar Filters (hidden on mobile, shown on lg+) -->
+    <aside class="hidden lg:block lg:col-span-3">
       <div class="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 sticky top-24">
         <div class="flex items-center justify-between mb-2">
           <h2 class="text-sm font-semibold">Filters</h2>
           <button id="clearAll" class="text-xs text-indigo-600 hover:underline">Clear all</button>
         </div>
         <div id="activePills" class="flex flex-wrap gap-2 mb-3"></div>
-        <div id="facets" class="space-y-4"><!-- sidebar facets are injected by app.js --></div>
+        <div id="facets" class="space-y-4"><!-- sidebar facets injected by app.js --></div>
       </div>
     </aside>
 
     <!-- Results + Toolbar -->
     <section class="lg:col-span-9">
       <div class="bg-white rounded-2xl border border-gray-200 p-3 sm:p-4">
-        <!-- Top toolbar (chips + inputs like GemsNY) -->
+        <!-- Top toolbar (chips + inputs) -->
         <div id="toolbar" class="mb-4 space-y-4">
           <!-- Gem Type -->
           <div>
@@ -170,9 +175,39 @@
     </section>
   </main>
 
-  <!-- Card template -->
+  <!-- Mobile bottom bar (shows on small screens) -->
+  <div class="fixed bottom-0 inset-x-0 z-40 sm:hidden">
+    <div class="mx-auto max-w-7xl px-4 pb-4">
+      <div class="bg-white/95 backdrop-blur shadow border rounded-2xl p-2 flex items-center justify-center gap-3">
+        <button id="mobileFiltersBtn" class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-gray-300 bg-white text-sm">
+          Filters
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile bottom sheet for filters -->
+  <div id="mobileSheet" class="fixed inset-0 z-50 hidden" aria-modal="true" role="dialog">
+    <div class="absolute inset-0 bg-black/40" data-close></div>
+    <div class="absolute inset-x-0 bottom-0 bg-white rounded-t-2xl shadow-xl max-h-[85vh] flex flex-col">
+      <div class="relative p-4 border-b">
+        <div class="absolute left-1/2 -translate-x-1/2 -top-3 h-1.5 w-12 bg-gray-300 rounded-full"></div>
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold">Filters</h3>
+          <button id="mobileClose" class="text-gray-500">Close</button>
+        </div>
+      </div>
+      <div class="overflow-y-auto p-4 space-y-4" id="facetsMobile"><!-- mobile facets injected by app.js --></div>
+      <div class="p-4 border-t flex gap-2">
+        <button id="mobileClear" class="px-3 py-2 rounded-lg border border-gray-300">Clear</button>
+        <button id="mobileApply" class="flex-1 px-3 py-2 rounded-lg bg-indigo-600 text-white">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card template (with expandable details + media strip) -->
   <template id="cardTpl">
-    <article class="card group bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <article class="card group bg-white rounded-xl border border-gray-200 overflow-hidden" data-card>
       <div class="aspect-square bg-gray-100 relative">
         <img class="w-full h-full object-cover" alt="Gem image" />
         <div class="absolute top-2 right-2 flex gap-1">
@@ -198,6 +233,13 @@
           <div><span class="text-gray-400">Origin:</span> <span data-origin></span></div>
         </div>
         <div class="text-[11px] text-gray-500"><span data-size></span></div>
+
+        <!-- EXPANDABLE DETAILS -->
+        <button type="button" class="mt-2 text-xs text-indigo-600 hover:underline" data-toggle>Details</button>
+        <div class="details hidden border-t border-gray-100 mt-2 pt-3 space-y-3" data-details>
+          <div class="media-strip" data-media></div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-gray-700" data-specs></div>
+        </div>
       </div>
     </article>
   </template>
@@ -220,4 +262,3 @@
   <script src="app.js"></script>
 </body>
 </html>
-
