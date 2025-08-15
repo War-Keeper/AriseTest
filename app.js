@@ -6,7 +6,7 @@
 /* ----- CONFIG ----- */
 const SHEET_SOURCES = [
   { name: "Sheet 1",
-    url: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrskicOCBNl6ntgcdNHGwTRaTQLrhMYsjHoYwiPAPyc72-awi5MQ9Rl5-jccvqI34RCNvDqJw2dz-T/pub?gid=0&single=true&output=csv" },
+    url: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrskicOCBNl6ntgcdNHGwTRaTQLrhMYsjHoYwiPAPyc72-awi5MQ9Rl5-jccvqI34RCNvDqJw2dz-T/pub?gid=1810937305&single=true&output=csv" },
 ];
 const ALWAYS_FRESH = true;
 
