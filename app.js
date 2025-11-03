@@ -1,448 +1,1869 @@
-/* =========================
-   Gem Catalog – Static + Google Sheet CSV
-   (higher-contrast active filters + outlined inputs/selects)
-   ========================= */
+/* Arise Precious Gems Luxury Inventory Application */
 
-/* ----- CONFIG ----- */
-const SHEET_SOURCES = [
-  { name: "Sheet 1",
-    url: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrskicOCBNl6ntgcdNHGwTRaTQLrhMYsjHoYwiPAPyc72-awi5MQ9Rl5-jccvqI34RCNvDqJw2dz-T/pub?gid=1810937305&single=true&output=csv" },
+const CSV_PATH = 'Arha_Stones_Inventory.csv';
+
+const STONE_TYPES = [
+  'Diamond',
+  'Ruby',
+  'Sapphire',
+  'Emerald',
+  'Tanzanite',
+  'Topaz',
+  'Garnet',
+  'Aquamarine',
+  'Peridot',
+  'Spinel',
 ];
-const ALWAYS_FRESH = true;
 
-/* Column aliases */
-const COLS = {
-  originalId: ["Original Stock ID","Original ID","Orig ID","Item No."],
-  stockId: ["Stock ID","SKU","ID","Stock","Product Number"],
-  stone: ["Stone","Gem","Gemstone","Species","Variety","Gemstone Type"],
-  origin: ["Origin","Country of Origin","Origin/Country","Gemstone Origin"],
-  shade: ["Shade","Tone","Gemstone Color Intensity"],
-  color: ["Color","Colour","Hue","Body Color"],
-  clarity: ["Clarity","Clarity Grade","Gemstone Clarity"],
-  shape: ["Shape","Cut","Shape/Cut","Gemstone Shape"],
-  sizeMm: ["Size (MM)","Size","Measurements (mm)","Dimensions","Dims (mm)","LxWxH (mm)","Length (mm)","Width (mm)","Height (mm)","Gemstone Dimensions"],
-  sizeRange: ["Mix Size Range","Size Range"],
-  caratTotal: ["Stone Weight - Carat Total","Carat","Weight","Carat Weight","Weight (ct)","Total Carat Weight","TCW","Gemstone Carat / Weight"],
-  pieces: ["Pieces","Qty","Quantity","Gemstone Pcs"],
-  purchasePerCt: ["Purchase Price per Carat","Purchase $/ct"],
-  b2bPerCt: ["B2B Price/Ct","B2B - Price/Ct","B2B $/ct"],
-  retailPerCt: ["Retail Price/Ct","Retail - Price/Ct","Retail $/ct","Price per ct","Price/Ct","Sale Price"],
-  totalPrice: ["Total USD Amount","Total Amount (USD)","Total Price"],
-  status: ["Status","Availability","In Stock","Available"],
-  imageUrl: ["Image URL","Image","Img","Image Link","Photo URL","Picture"],
-  certificate: ["Certificates","Certificate"],
-  certificateNumber: ["Certificate Number","Cert #"],
-  treatment: ["Gemstone Treatment","Treatment"],
-  source: ["Gemstone Source","Source"],
-  media: ["Media","Media URLs","Gallery","Images","Photos","Videos","Media Links"],
+const SHAPE_OPTIONS = [
+  { value: 'Round', icon: '●' },
+  { value: 'Cushion', icon: '◇' },
+  { value: 'Emerald', icon: '▭' },
+  { value: 'Princess', icon: '◆' },
+  { value: 'Oval', icon: '⬭' },
+  { value: 'Radiant', icon: '⬢' },
+  { value: 'Asscher', icon: '◻' },
+  { value: 'Heart', icon: '♥' },
+  { value: 'Marquise', icon: '⬥' },
+  { value: 'Pear', icon: '💧' },
+];
+
+const CARAT_PRESETS = [
+  { id: 'under1', label: 'Under 1ct', range: [0, 1] },
+  { id: '1to3', label: '1-3ct', range: [1, 3] },
+  { id: '3to5', label: '3-5ct', range: [3, 5] },
+  { id: '5to7', label: '5-7ct', range: [5, 7] },
+  { id: 'over7', label: 'Over 7ct', range: [7, 10] },
+];
+
+const PRICE_PRESETS = [
+  { id: 'under1k', label: 'Under $1,000', range: [0, 1000] },
+  { id: '1to5k', label: '$1,000 - $5,000', range: [1000, 5000] },
+  { id: '5to10k', label: '$5,000 - $10,000', range: [5000, 10000] },
+  { id: '10to15k', label: '$10,000 - $15,000', range: [10000, 15000] },
+  { id: 'over15k', label: '$15,000+', range: [15000, 25000] },
+];
+
+const DIAMOND_COLORS = ['D', 'E', 'F', 'G', 'H', 'I', 'J'];
+const GEMSTONE_COLORS = [
+  'Deep Green',
+  'Vivid Pink',
+  'Royal Blue',
+  'Purple',
+  'Orange',
+  'Teal',
+  'Violet',
+  'Padparadscha',
+  'Yellow',
+];
+
+const CLARITY_OPTIONS = [
+  { value: 'IF', label: 'IF (Internally Flawless)' },
+  { value: 'VVS1', label: 'VVS1 (Very Very Slightly Included 1)' },
+  { value: 'VVS2', label: 'VVS2 (Very Very Slightly Included 2)' },
+  { value: 'VS1', label: 'VS1 (Very Slightly Included 1)' },
+  { value: 'VS2', label: 'VS2 (Very Slightly Included 2)' },
+  { value: 'SI1', label: 'SI1 (Slightly Included 1)' },
+  { value: 'SI2', label: 'SI2 (Slightly Included 2)' },
+];
+
+const CUT_OPTIONS = ['Excellent', 'Very Good', 'Good'];
+
+const LAB_OPTIONS = ['GIA', 'IGI', 'AGL', 'HRD', 'None'];
+
+const TREATMENT_OPTIONS = ['None', 'Heat', 'No Heat', 'Minor Oil', 'Diffusion', 'Fracture Filled'];
+
+const ORIGIN_OPTIONS = ['Myanmar', 'Colombia', 'Brazil', 'Sri Lanka', 'Madagascar', 'Mozambique', 'Tanzania', 'Thailand'];
+
+const LAB_LINKS = {
+  GIA: 'https://www.gia.edu/report-check?reportno=',
+  IGI: 'https://www.igi.org/verify-your-report/?r=',
+  AGL: 'https://www.aglgemlab.com/verify-report.php?report=',
+  HRD: 'https://my.hrdantwerp.com/en/services/verify-your-report/',
 };
 
-/* Colors */
-const COLOR_MAP = {
-  red:"#DC2626", ruby:"#E11D48", pink:"#EC4899", fuchsia:"#C026D3",
-  purple:"#7C3AED", violet:"#8B5CF6", blue:"#2563EB", teal:"#0D9488",
-  green:"#16A34A", yellow:"#F59E0B", orange:"#EA580C", brown:"#92400E",
-  champagne:"#E8D6B0", peach:"#F4A38C", black:"#111827", white:"#F3F4F6",
-  colorless:"#F3F4F6", gray:"#9CA3AF",
-};
-const STONE_DEFAULT = {
-  sapphire:"#2563EB", ruby:"#E11D48", emerald:"#16A34A", diamond:"#F3F4F6",
-  spinel:"#7C3AED", tourmaline:"#10B981", garnet:"#B91C1C", topaz:"#60A5FA",
-};
-
-/* ----- UTIL (regex-free) ----- */
-const Q = (id) => document.getElementById(id);
-const normKey = (s) => String(s || "").trim().toLowerCase();
-const byAliases = (row, aliases) => {
-  for (const a of aliases) {
-    const key = Object.keys(row).find((k) => normKey(k) === normKey(a)) || null;
-    if (key && row[key] != null && row[key] !== "") return row[key];
-  }
-  return "";
+const PLACEHOLDER_META = {
+  Diamond: { icon: '💎', gradient: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)' },
+  Ruby: { icon: '❤️', gradient: 'linear-gradient(135deg, #fee2e2, #fecaca)' },
+  Sapphire: { icon: '💠', gradient: 'linear-gradient(135deg, #dbeafe, #bfdbfe)' },
+  Emerald: { icon: '💚', gradient: 'linear-gradient(135deg, #d1fae5, #a7f3d0)' },
+  Tanzanite: { icon: '🔷', gradient: 'linear-gradient(135deg, #dbeafe, #d1d5ff)' },
+  Topaz: { icon: '🔹', gradient: 'linear-gradient(135deg, #bae6fd, #7dd3fc)' },
+  Garnet: { icon: '♦️', gradient: 'linear-gradient(135deg, #fde7f3, #fbcfe8)' },
+  Aquamarine: { icon: '🌊', gradient: 'linear-gradient(135deg, #cffafe, #a5f3fc)' },
+  Peridot: { icon: '💚', gradient: 'linear-gradient(135deg, #bef264, #a3e635)' },
+  Spinel: { icon: '🔺', gradient: 'linear-gradient(135deg, #ede9fe, #ddd6fe)' },
+  Default: { icon: '💎', gradient: 'linear-gradient(135deg, #f3e8ff, #e9d5ff)' },
 };
 
-// number parsing without regex
-const stripNonNumeric = (v) => {
-  const s = String(v ?? ""); let out = "";
-  for (let i=0;i<s.length;i++){ const ch=s[i]; if((ch>="0"&&ch<="9")||ch==="."||ch==="-" ) out+=ch; }
-  return out;
-};
-const parseCurrency = (v) => { if (v==null) return null; const f=parseFloat(stripNonNumeric(v)); return Number.isFinite(f)?f:null; };
-const parseNumber = parseCurrency;
-
-// media split without regex
-function safeSplitMedia(raw){
-  const s=String(raw||""); const out=[]; let t="";
-  for(let i=0;i<s.length;i++){ const c=s[i];
-    if(c===','||c===';'||c==='|'||c==='\n'||c==='\r'){ if(t.trim()) out.push(t.trim()); t=""; }
-    else t+=c;
-  }
-  if(t.trim()) out.push(t.trim());
-  return out;
-}
-function isVideo(u){ const s=(u||"").toLowerCase().split("?")[0]; return [".mp4",".webm",".ogg",".mov"].some(ext=>s.endsWith(ext)); }
-
-const fmtMoney = (n) => (n == null ? "-" : `$${n.toLocaleString(undefined,{maximumFractionDigits:0})}`);
-const fmtCarat = (n) => (n == null ? "-" : `${n.toFixed(2)} ct`);
-const colorHex = (stone,color)=>{ const c=normKey(color); if(COLOR_MAP[c]) return COLOR_MAP[c]; const s=normKey(stone); return STONE_DEFAULT[s] || "#CBD5E1"; };
-
-/* Quality scoring */
-function gradeLabel(score){ if(score>=4.75) return "AAAAA"; if(score>=3.75) return "AAAA"; if(score>=2.75) return "AAA"; if(score>=1.75) return "AA"; return "A"; }
-function clarityScore(c){ const m={IF:5,VVS:4.5,VVVS:4.5,VS:4,SI:3,I1:2,OPAQUE:1.5,TRANSLUCENT:2.5,TRANSPARENT:3}; return m[(c||"").toUpperCase()]||3; }
-function treatmentPenalty(t){ const s=(t||"").toLowerCase(); const has=(k)=>s.indexOf(k)!==-1; if(!s||has("none")||has("unheated")||has("no oil")||has("untreated")) return +0.5; if(has("minor oil")) return -0.2; if(has("moderate")||has("irradiated")||has("glass")||has("stabilized")) return -0.6; return -0.3; }
-function calcQuality(x){ let base=clarityScore(x.clarity); base+=treatmentPenalty(x.treatment); return Math.max(1,Math.min(5,base)); }
-
-/* ----- STATE ----- */
-let ALL=[], VIEW=[], FACETS={};
 const state = {
-  q:"", stone:new Set(), color:new Set(), shape:new Set(), clarity:new Set(),
-  origin:new Set(), shade:new Set(), status:new Set(), certificate:new Set(),
-  treatment:new Set(), pair:new Set(),
-  minCt:null, maxCt:null, minTotal:null, maxTotal:null,
-  qualityMin:1, qualityMax:5, sort:"featured", page:1, perPage:24,
+  inventory: [],
+  filteredInventory: [],
+  totalCount: 0,
+  expandedId: null,
+  viewMode: 'grid',
+  searchTerm: '',
+  headerSearchTerm: '',
+  sortBy: 'recent',
+  filters: {
+    status: 'all',
+    types: new Set(),
+    shapes: new Set(),
+    carat: { min: 0.5, max: 10 },
+    colors: new Set(),
+    clarities: new Set(),
+    cuts: new Set(),
+    labs: new Set(),
+    price: { min: 0, max: 20000, includeCall: true },
+    treatments: new Set(),
+    growth: 'all',
+    origins: new Set(),
+  },
 };
 
-/* ----- LOAD CSV ----- */
-function showSkeletons(n=12){ const grid=Q("grid"); if(!grid) return; grid.innerHTML=""; const tpl=Q("skeletonTpl")?.content; if(!tpl) return; for(let i=0;i<n;i++) grid.appendChild(tpl.cloneNode(true)); }
-function loadCSV(url){ return new Promise((resolve,reject)=>{ if(!window.Papa){ reject(new Error("PapaParse not loaded")); return; } Papa.parse(url,{download:true,header:true,skipEmptyLines:true,complete:(r)=>resolve(r.data),error:reject}); }); }
-function mapRow(row){
-  const o = {
-    originalId: byAliases(row,COLS.originalId),
-    stockId: byAliases(row,COLS.stockId),
-    stone: byAliases(row,COLS.stone),
-    origin: byAliases(row,COLS.origin),
-    shade: byAliases(row,COLS.shade),
-    color: byAliases(row,COLS.color),
-    clarity: byAliases(row,COLS.clarity),
-    shape: byAliases(row,COLS.shape),
-    sizeMm: byAliases(row,COLS.sizeMm),
-    sizeRange: byAliases(row,COLS.sizeRange),
-    caratTotal: parseNumber(byAliases(row,COLS.caratTotal)),
-    pieces: parseNumber(byAliases(row,COLS.pieces)),
-    purchasePerCt: parseCurrency(byAliases(row,COLS.purchasePerCt)),
-    b2bPerCt: parseCurrency(byAliases(row,COLS.b2bPerCt)),
-    retailPerCt: parseCurrency(byAliases(row,COLS.retailPerCt)),
-    totalPrice: parseCurrency(byAliases(row,COLS.totalPrice)),
-    status: byAliases(row,COLS.status) || "On-Site",
-    imageUrl: byAliases(row,COLS.imageUrl),
-    certificate: byAliases(row,COLS.certificate),
-    certificateNumber: byAliases(row,COLS.certificateNumber),
-    treatment: byAliases(row,COLS.treatment),
-    source: byAliases(row,COLS.source),
-    media: (() => {
-      const raw = byAliases(row, COLS.media);
-      const list = safeSplitMedia(raw ? raw : byAliases(row, COLS.imageUrl));
-      return list.length ? list : [];
-    })(),
+const elements = {};
+
+document.addEventListener('DOMContentLoaded', initApp);
+
+function initApp() {
+  cacheDom();
+  setupAccordions();
+  setupEventListeners();
+  populateStaticFilters();
+  loadInventory();
+}
+
+function cacheDom() {
+  elements.filterPanel = document.querySelector('.filter-panel');
+  elements.filterPanelInner = document.querySelector('.filter-panel-inner');
+  elements.filterResultCount = document.getElementById('filterResultCount');
+  elements.totalCount = document.getElementById('totalCount');
+  elements.visibleCount = document.getElementById('visibleCount');
+  elements.activeFilterCount = document.getElementById('activeFilterCount');
+  elements.activeFilterChips = document.getElementById('activeFilterChips');
+  elements.quickSearch = document.getElementById('quickSearch');
+  elements.quickSearchClear = elements.quickSearch?.nextElementSibling;
+  elements.headerSearch = document.getElementById('headerSearch');
+  elements.headerSearchClear = document.querySelector('.header-center .clear-search');
+  elements.productGrid = document.getElementById('productGrid');
+  elements.resultsVisible = document.getElementById('resultsVisible');
+  elements.resultsTotal = document.getElementById('resultsTotal');
+  elements.sortBy = document.getElementById('sortBy');
+  elements.viewToggle = document.querySelector('.view-toggle');
+  elements.clearAllFilters = document.getElementById('clearAllFilters');
+  elements.menuToggle = document.querySelector('.menu-toggle');
+  elements.closeFilters = document.getElementById('closeFilters');
+  elements.uploadCsvBtn = document.getElementById('uploadCsvBtn');
+  elements.priceCallOption = document.getElementById('priceCallOption');
+  elements.treatmentLearnMore = document.getElementById('learnTreatments');
+  elements.lightboxModal = document.getElementById('lightboxModal');
+  elements.lightboxImage = document.getElementById('lightboxImage');
+  elements.comingSoonModal = document.getElementById('comingSoonModal');
+  elements.treatmentModal = document.getElementById('treatmentModal');
+  elements.colorFilterOptions = document.getElementById('colorFilterOptions');
+  elements.typeFilterOptions = document.getElementById('typeFilterOptions');
+  elements.shapeFilterOptions = document.getElementById('shapeFilterOptions');
+  elements.caratRangeMin = document.getElementById('caratRangeMin');
+  elements.caratRangeMax = document.getElementById('caratRangeMax');
+  elements.caratMin = document.getElementById('caratMin');
+  elements.caratMax = document.getElementById('caratMax');
+  elements.caratPresets = document.getElementById('caratPresets');
+  elements.priceRangeMin = document.getElementById('priceRangeMin');
+  elements.priceRangeMax = document.getElementById('priceRangeMax');
+  elements.priceMin = document.getElementById('priceMin');
+  elements.priceMax = document.getElementById('priceMax');
+  elements.pricePresets = document.getElementById('pricePresets');
+  elements.clarityFilterOptions = document.getElementById('clarityFilterOptions');
+  elements.cutFilterOptions = document.getElementById('cutFilterOptions');
+  elements.labFilterOptions = document.getElementById('labFilterOptions');
+  elements.treatmentFilterOptions = document.getElementById('treatmentFilterOptions');
+  elements.originFilterOptions = document.getElementById('originFilterOptions');
+  elements.growthFilterOptions = document.getElementById('growthFilterOptions');
+  elements.statusCounts = {
+    all: document.querySelector('[data-count="status-all"]'),
+    available: document.querySelector('[data-count="status-available"]'),
+    hold: document.querySelector('[data-count="status-hold"]'),
+    sold: document.querySelector('[data-count="status-sold"]'),
   };
-  if (o.totalPrice == null && o.caratTotal && o.retailPerCt) o.totalPrice = +(o.caratTotal * o.retailPerCt).toFixed(2);
-  if (!o.media.length && o.imageUrl) o.media = [o.imageUrl];
-  o.isPair = (o.pieces || 1) >= 2 ? "Pair" : "Single";
-  o.qualityScore = calcQuality(o);
-  o.qualityLabel = gradeLabel(o.qualityScore);
-  return o;
-}
-async function loadData(){
-  showSkeletons();
-  try{
-    const firstURL=SHEET_SOURCES[0]?.url||"#"; const csvLink=Q("csvLink"); if(csvLink) csvLink.href=firstURL;
-    const parts=await Promise.all(SHEET_SOURCES.map(async src=>{ const url=ALWAYS_FRESH&&src.url ? src.url+(src.url.includes("?")?"&":"?")+"cb="+Date.now() : src.url; const rows=await loadCSV(url); return rows.map(r=>({...r,__tab:src.name||"Sheet"})); }));
-    const rows=parts.flat();
-    ALL = rows.map(r=>{ const m=mapRow(r); m.tab=r.__tab||"Sheet"; return m; });
-
-    buildFacets();
-    renderToolbar();
-    readURL();
-    applyFilters();
-  }catch(err){
-    console.error("CSV load failed:", err);
-    const grid=Q("grid"); if(grid) grid.innerHTML="<div class='col-span-full text-center text-sm text-red-600'>Failed to load data. Check your published CSV URL.</div>";
-  }
-}
-
-/* ----- FACETS ----- */
-const uniq=(list)=>[...new Set(list.filter(Boolean).map(v=>String(v).trim()))].sort((a,b)=>a.localeCompare(b));
-
-function facetSection(id,title,items,renderLabel){
-  const wrap=document.createElement("div"); wrap.className="border-t border-gray-200 pt-3";
-  const details=document.createElement("details"); details.open=true; details.className="group";
-  const summary=document.createElement("summary"); summary.className="cursor-pointer list-none flex items-center justify-between text-sm font-medium text-gray-900 select-none";
-  summary.innerHTML=`<span>${title}</span><span class="text-gray-400 group-open:rotate-180 transition"><i data-feather="chevron-down"></i></span>`;
-  const box=document.createElement("div"); box.className="mt-2 flex flex-wrap gap-2";
-  items.forEach(val=>{
-    const btn=document.createElement("button");
-    btn.className="filter-btn";
-    btn.dataset.facet=id;
-    btn.dataset.value=val;
-    btn.addEventListener("click",()=>{ toggleSet(state[id],val); state.page=1; applyFilters(); });
-    if(renderLabel){ btn.appendChild(renderLabel(val)); } else { btn.textContent=val; }
-    box.appendChild(btn);
-  });
-  details.appendChild(summary); details.appendChild(box); wrap.appendChild(details);
-  return wrap;
-}
-
-function renderFacetsInto(containerId, suffix="", { includeStone=true } = {}){
-  const facetsEl=Q(containerId); if(!facetsEl) return; facetsEl.innerHTML="";
-  if(includeStone) facetsEl.appendChild(facetSection("stone","Stone",FACETS.stone));
-  facetsEl.appendChild(facetSection("color","Color",FACETS.color,(val)=>{ const span=document.createElement("span"); const dot=document.createElement("span"); dot.className="swatch"; dot.style.background=colorHex(null,val); const txt=document.createElement("span"); txt.textContent=val; span.append(dot,txt); return span; }));
-  facetsEl.appendChild(facetSection("shape","Shape",FACETS.shape));
-  facetsEl.appendChild(facetSection("clarity","Clarity",FACETS.clarity));
-  facetsEl.appendChild(facetSection("origin","Origin",FACETS.origin));
-  facetsEl.appendChild(facetSection("shade","Shade",FACETS.shade));
-  facetsEl.appendChild(facetSection("status","Status",FACETS.status));
-  facetsEl.appendChild(facetSection("certificate","Certificate",FACETS.certificate));
-  facetsEl.appendChild(facetSection("treatment","Enhancement",FACETS.treatment));
-  facetsEl.appendChild(facetSection("pair","Single/Pair",FACETS.pair));
-
-  // Ranges (outlined fields)
-  const rangeWrap=document.createElement("div");
-  rangeWrap.className="border-t border-gray-200 pt-3 space-y-3";
-  rangeWrap.innerHTML=`
-    <div>
-      <div class="text-sm font-medium">Carat</div>
-      <div class="mt-2 grid grid-cols-2 gap-2">
-        <input id="minCt${suffix}" type="number" step="0.01" placeholder="Min" class="form-field rounded-lg" />
-        <input id="maxCt${suffix}" type="number" step="0.01" placeholder="Max" class="form-field rounded-lg" />
-      </div>
-    </div>
-    <div>
-      <div class="text-sm font-medium">Total Price ($)</div>
-      <div class="mt-2 grid grid-cols-2 gap-2">
-        <input id="minTotal${suffix}" type="number" step="1" placeholder="Min" class="form-field rounded-lg" />
-        <input id="maxTotal${suffix}" type="number" step="1" placeholder="Max" class="form-field rounded-lg" />
-      </div>
-    </div>`;
-  facetsEl.appendChild(rangeWrap);
-
-  ["minCt","maxCt","minTotal","maxTotal"].forEach((k)=>{ const el=Q(k+suffix); if(el) el.addEventListener("change",()=>{ state[k]=parseNumber(el.value); state.page=1; applyFilters(); }); });
-
-  try{ window.feather && window.feather.replace(); }catch(_){}
-}
-
-function buildFacets(){
-  FACETS = {
-    stone: uniq(ALL.map(x=>x.stone)),
-    color: uniq(ALL.map(x=>x.color)),
-    shape: uniq(ALL.map(x=>x.shape)),
-    clarity: uniq(ALL.map(x=>x.clarity)),
-    origin: uniq(ALL.map(x=>x.origin)),
-    shade: uniq(ALL.map(x=>x.shade)),
-    status: uniq(ALL.map(x=>x.status)),
-    certificate: uniq(ALL.map(x=>x.certificate)),
-    treatment: uniq(ALL.map(x=>x.treatment)),
-    pair: uniq(ALL.map(x=>x.isPair)),
+  elements.filterSections = {
+    color: document.querySelector('[data-filter="color"]'),
+    clarity: document.querySelector('[data-filter="clarity"]'),
+    growth: document.querySelector('[data-filter="growth"]'),
+    origin: document.querySelector('[data-filter="origin"]'),
   };
-  // Desktop (no Gem Type)
-  renderFacetsInto("facets","",{includeStone:false});
-  // Mobile (Gem Type included)
-  renderFacetsInto("facetsMobile","M",{includeStone:true});
 }
 
-/* ----- Toolbar chips (with active style) ----- */
-function renderToolbar(){
-  const fill=(id,label,items)=>{ const el=Q(id); if(!el) return; el.innerHTML=`<option value="">${label}</option>` + items.map(o=>`<option>${o}</option>`).join(""); };
-  fill("selOrigin","Origin",FACETS.origin);
-  fill("selClarity","Clarity",FACETS.clarity);
-  fill("selCert","Certificate",FACETS.certificate);
-  fill("selTreatment","Enhancement",FACETS.treatment);
+function setupAccordions() {
+  elements.filterPanel?.addEventListener('click', (event) => {
+    const button = event.target.closest('.filter-toggle');
+    if (!button) return;
 
-  renderChips("chipStones", FACETS.stone, "stone");
-  renderChips("chipShapes", FACETS.shape, "shape");
+    const section = button.closest('.filter-section');
+    const content = section?.querySelector('.filter-content');
+    if (!section || !content) return;
 
-  syncSelectionsUI(); // initial highlight
-}
-
-function renderChips(id, items, facet){
-  const box=Q(id); if(!box) return; box.innerHTML="";
-  items.forEach(val=>{
-    const btn=document.createElement("button");
-    btn.className="filter-chip";
-    btn.dataset.facet=facet;
-    btn.dataset.value=val;
-    btn.innerHTML = facet==="stone"
-      ? `<span class="swatch mr-1" style="background:${colorHex(val,val)}"></span>${val}`
-      : val;
-    btn.addEventListener("click",()=>{ toggleSet(state[facet],val); state.page=1; applyFilters(); });
-    box.appendChild(btn);
+    const isExpanded = section.classList.toggle('expanded');
+    button.setAttribute('aria-expanded', String(isExpanded));
+    if (isExpanded) {
+      content.removeAttribute('hidden');
+    } else {
+      content.setAttribute('hidden', '');
+    }
   });
 }
 
-/* Toggle active classes everywhere */
-function syncSelectionsUI(){
-  document.querySelectorAll("[data-facet]").forEach(el=>{
-    const set = state[el.dataset.facet];
-    const isOn = set && set.has(el.dataset.value);
-    el.classList.toggle("active", !!isOn);
-  });
-}
+function setupEventListeners() {
+  if (elements.quickSearch) {
+    const debouncedSearch = debounce((value) => {
+      state.searchTerm = value;
+      syncHeaderSearch(value);
+      applyFilters();
+    }, 300);
 
-/* ----- DETAILS (expand + media) ----- */
-function buildDetails(cardEl,x){
-  const mediaBox=cardEl.querySelector("[data-media]");
-  const specsBox=cardEl.querySelector("[data-specs]");
-  if(mediaBox && !mediaBox.childElementCount){
-    x.media.forEach(url=>{
-      const wrap=document.createElement("div"); wrap.className="media-item aspect-square";
-      if(isVideo(url)){ const v=document.createElement("video"); v.src=url; v.controls=true; v.playsInline=true; v.preload="metadata"; wrap.appendChild(v); }
-      else{ const img=document.createElement("img"); img.src=url; img.alt=x.stone||"Media"; wrap.appendChild(img); }
-      mediaBox.appendChild(wrap);
+    elements.quickSearch.addEventListener('input', (event) => {
+      const value = event.target.value.trim().toLowerCase();
+      toggleClearButton(elements.quickSearchClear, value);
+      debouncedSearch(value);
+    });
+
+    elements.quickSearchClear?.addEventListener('click', () => {
+      elements.quickSearch.value = '';
+      toggleClearButton(elements.quickSearchClear, '');
+      state.searchTerm = '';
+      syncHeaderSearch('');
+      applyFilters();
     });
   }
-  if(specsBox && !specsBox.childElementCount){
-    const rows=[["Item No",x.originalId],["Product #",x.stockId],["Type",x.stone],["Source",x.source],["Color",x.color],["Intensity",x.shade],["Clarity",x.clarity],["Shape",x.shape],["Carat",fmtCarat(x.caratTotal)],["Pieces",x.pieces||1],["Origin",x.origin],["Treatment",x.treatment],["Certificate",x.certificate],["Cert #",x.certificateNumber],["Size",[x.sizeMm,x.sizeRange].filter(Boolean).join(" | ")],["$/ct",fmtMoney(x.retailPerCt)],["Total",fmtMoney(x.totalPrice)],["Status",x.status]];
-    rows.forEach(([k,v])=>{ const d=document.createElement("div"); d.innerHTML=`<div class="text-gray-400">${k}</div><div class="font-medium">${v||"—"}</div>`; specsBox.appendChild(d); });
+
+  if (elements.headerSearch) {
+    const debouncedHeaderSearch = debounce((value) => {
+      state.searchTerm = value;
+      syncQuickSearch(value);
+      applyFilters();
+    }, 300);
+
+    elements.headerSearch.addEventListener('input', (event) => {
+      const value = event.target.value.trim().toLowerCase();
+      toggleClearButton(elements.headerSearchClear, value);
+      debouncedHeaderSearch(value);
+    });
+
+    elements.headerSearchClear?.addEventListener('click', () => {
+      elements.headerSearch.value = '';
+      toggleClearButton(elements.headerSearchClear, '');
+      state.searchTerm = '';
+      syncQuickSearch('');
+      applyFilters();
+    });
+  }
+
+  elements.sortBy?.addEventListener('change', (event) => {
+    state.sortBy = event.target.value;
+    renderProducts();
+  });
+
+  elements.viewToggle?.addEventListener('click', (event) => {
+    const button = event.target.closest('.toggle-btn');
+    if (!button) return;
+    const view = button.dataset.view;
+    state.viewMode = view;
+    elements.viewToggle.querySelectorAll('.toggle-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn === button);
+      btn.setAttribute('aria-pressed', String(btn === button));
+    });
+    elements.productGrid?.classList.toggle('list-view', view === 'list');
+  });
+
+  elements.clearAllFilters?.addEventListener('click', clearAllFilters);
+
+  elements.menuToggle?.addEventListener('click', () => {
+    elements.filterPanel?.classList.toggle('open');
+  });
+
+  elements.closeFilters?.addEventListener('click', () => {
+    elements.filterPanel?.classList.remove('open');
+  });
+
+  elements.uploadCsvBtn?.addEventListener('click', () => {
+    showComingSoon('CSV Upload support is coming soon. Currently displaying curated inventory.');
+  });
+
+  elements.priceCallOption?.addEventListener('change', (event) => {
+    state.filters.price.includeCall = event.target.checked;
+    applyFilters();
+  });
+
+  elements.treatmentLearnMore?.addEventListener('click', () => {
+    openModal(elements.treatmentModal);
+  });
+
+  document.body.addEventListener('click', (event) => {
+    if (event.target.matches('[data-close-modal]')) {
+      closeModal(event.target.closest('.modal'));
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      closeModal(elements.lightboxModal);
+      closeModal(elements.comingSoonModal);
+      closeModal(elements.treatmentModal);
+    }
+  });
+
+  setupFilterOptionListeners();
+  setupRangeControls();
+}
+
+function setupFilterOptionListeners() {
+  // Status radio buttons
+  document.querySelectorAll('input[name="status"]').forEach((input) => {
+    input.addEventListener('change', (event) => {
+      state.filters.status = event.target.value;
+      applyFilters();
+    });
+  });
+
+  // Stone type select/deselect buttons
+  const typeSection = document.querySelector('[data-filter="type"]');
+  const selectAllBtn = typeSection?.querySelector('[data-action="select-all"]');
+  const deselectAllBtn = typeSection?.querySelector('[data-action="deselect-all"]');
+
+  selectAllBtn?.addEventListener('click', () => {
+    state.filters.types = new Set(STONE_TYPES);
+    typeSection.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+      input.checked = true;
+    });
+    applyFilters();
+    updateColorFilterOptions();
+    updateConditionalFilters();
+  });
+
+  deselectAllBtn?.addEventListener('click', () => {
+    state.filters.types = new Set();
+    typeSection.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+      input.checked = false;
+    });
+    applyFilters();
+    updateColorFilterOptions();
+    updateConditionalFilters();
+  });
+
+  elements.growthFilterOptions?.querySelectorAll('input').forEach((input) => {
+    input.addEventListener('change', () => {
+      state.filters.growth = input.value;
+      applyFilters();
+    });
+  });
+}
+
+function setupRangeControls() {
+  if (elements.caratRangeMin && elements.caratRangeMax) {
+    const syncCaratRange = () => {
+      let min = parseFloat(elements.caratRangeMin.value);
+      let max = parseFloat(elements.caratRangeMax.value);
+      if (min > max) [min, max] = [max, min];
+      min = Math.max(0, min);
+      max = Math.max(min, max);
+      elements.caratRangeMin.value = min.toString();
+      elements.caratRangeMax.value = max.toString();
+      elements.caratMin.value = min.toFixed(2);
+      elements.caratMax.value = max.toFixed(2);
+      state.filters.carat = { min, max };
+      applyFilters();
+    };
+
+    elements.caratRangeMin.addEventListener('input', syncCaratRange);
+    elements.caratRangeMax.addEventListener('input', syncCaratRange);
+    elements.caratMin?.addEventListener('change', () => {
+      const min = parseFloat(elements.caratMin.value) || 0;
+      elements.caratRangeMin.value = min;
+      syncCaratRange();
+    });
+    elements.caratMax?.addEventListener('change', () => {
+      const max = parseFloat(elements.caratMax.value) || 10;
+      elements.caratRangeMax.value = max;
+      syncCaratRange();
+    });
+  }
+
+  if (elements.priceRangeMin && elements.priceRangeMax) {
+    const syncPriceRange = () => {
+      let min = parseFloat(elements.priceRangeMin.value);
+      let max = parseFloat(elements.priceRangeMax.value);
+      if (min > max) [min, max] = [max, min];
+      min = Math.max(0, min);
+      max = Math.max(min, max);
+      elements.priceRangeMin.value = min.toString();
+      elements.priceRangeMax.value = max.toString();
+      elements.priceMin.value = Math.round(min);
+      elements.priceMax.value = Math.round(max);
+      state.filters.price.min = min;
+      state.filters.price.max = max;
+      applyFilters();
+    };
+
+    elements.priceRangeMin.addEventListener('input', syncPriceRange);
+    elements.priceRangeMax.addEventListener('input', syncPriceRange);
+    elements.priceMin?.addEventListener('change', () => {
+      const min = parseFloat(elements.priceMin.value) || 0;
+      elements.priceRangeMin.value = min;
+      syncPriceRange();
+    });
+    elements.priceMax?.addEventListener('change', () => {
+      const max = parseFloat(elements.priceMax.value) || 20000;
+      elements.priceRangeMax.value = max;
+      syncPriceRange();
+    });
   }
 }
-function toggleDetails(cardEl,data){ const box=cardEl.querySelector("[data-details]"); if(!box) return; const isOpen=!box.classList.contains("hidden"); if(isOpen){ box.classList.add("hidden"); } else { buildDetails(cardEl,data); box.classList.remove("hidden"); } }
 
-/* ----- FILTER, SORT, URL ----- */
-const toggleSet=(set,val)=>{ set.has(val) ? set.delete(val) : set.add(val); };
-const matchesText=(x,q)=>{ if(!q) return true; const hay=`${x.stockId} ${x.originalId} ${x.stone} ${x.color} ${x.shape} ${x.clarity} ${x.origin} ${x.shade}`.toLowerCase(); return hay.indexOf(q.toLowerCase()) !== -1; };
-const inSetOrAny=(set,val)=> set.size===0 || set.has(val);
-function passesRanges(x){
-  if(state.minCt!=null && !(x.caratTotal!=null && x.caratTotal>=state.minCt)) return false;
-  if(state.maxCt!=null && !(x.caratTotal!=null && x.caratTotal<=state.maxCt)) return false;
-  if(state.minTotal!=null && !(x.totalPrice!=null && x.totalPrice>=state.minTotal)) return false;
-  if(state.maxTotal!=null && !(x.totalPrice!=null && x.totalPrice<=state.maxTotal)) return false;
-  if(state.qualityMin!=null && !(x.qualityScore>=state.qualityMin)) return false;
-  if(state.qualityMax!=null && !(x.qualityScore<=state.qualityMax)) return false;
-  return true;
+function loadInventory() {
+  if (typeof Papa === 'undefined') {
+    console.error('PapaParse failed to load. Please check your network connection.');
+    return;
+  }
+  Papa.parse(CSV_PATH, {
+    header: true,
+    download: true,
+    skipEmptyLines: true,
+    dynamicTyping: false,
+    complete: (results) => {
+      processInventory(results.data || []);
+    },
+    error: (error) => {
+      console.error('Failed to load CSV', error);
+    },
+  });
 }
-function sortView(list){
-  const s=state.sort, copy=[...list];
-  switch(s){
-    case "priceAsc": return copy.sort((a,b)=>(a.retailPerCt ?? Infinity)-(b.retailPerCt ?? Infinity));
-    case "priceDesc":return copy.sort((a,b)=>(b.retailPerCt ?? -Infinity)-(a.retailPerCt ?? -Infinity));
-    case "caratAsc": return copy.sort((a,b)=>(a.caratTotal ?? Infinity)-(b.caratTotal ?? Infinity));
-    case "caratDesc":return copy.sort((a,b)=>(b.caratTotal ?? -Infinity)-(a.caratTotal ?? -Infinity));
-    case "newest":  return copy.sort((a,b)=>(b.stockId||"").localeCompare(a.stockId||""));
-    default: return copy;
+
+function processInventory(rawRows) {
+  const processed = rawRows
+    .map((row) => transformRow(row))
+    .filter(Boolean);
+
+  state.inventory = processed;
+  state.totalCount = processed.length;
+
+  elements.totalCount.textContent = state.totalCount;
+  elements.resultsTotal.textContent = state.totalCount;
+
+  applyFilters();
+  updateColorFilterOptions();
+  updateConditionalFilters();
+  updateFilterCounts();
+}
+
+function transformRow(row) {
+  if (!row || !row['Stock #']) return null;
+
+  const cleanString = (value) => {
+    if (value === undefined || value === null) return '';
+    const trimmed = String(value).trim();
+    return trimmed === '-' ? '' : trimmed;
+  };
+
+  const parseNumber = (value) => {
+    if (!value || value === '-' || value === 'Call For Price') return null;
+    const number = parseFloat(String(value).replace(/[^0-9.]/g, ''));
+    return Number.isFinite(number) ? number : null;
+  };
+
+  const parsePrice = (value) => {
+    if (!value || value === 'Call For Price') return null;
+    const parsed = parseFloat(String(value).replace(/[^0-9.]/g, ''));
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const otherImagesRaw = cleanString(row['Other Images Links (comma Separated)']);
+  const otherImages = otherImagesRaw
+    ? otherImagesRaw
+        .split(',')
+        .map((image) => image.trim())
+        .filter(Boolean)
+    : [];
+
+  const primaryImage = cleanString(row['Primary Image Link']);
+  const images = primaryImage ? [primaryImage, ...otherImages] : otherImages;
+
+  const totalPriceRaw = cleanString(row['Total Price (Total)']);
+  const perCaratPriceRaw = cleanString(row['Price per Carat (P/ct)']);
+
+  const totalPrice = parsePrice(totalPriceRaw);
+  const perCaratPrice = parsePrice(perCaratPriceRaw);
+  const isCallForPrice = totalPriceRaw === 'Call For Price';
+
+  const type = cleanString(row.Type);
+  const status = cleanString(row.Status) || 'Available';
+  const clarity = cleanString(row.Clarity);
+  const cut = cleanString(row.Cut);
+  const lab = cleanString(row.Lab) || 'None';
+  const treatment = cleanString(row['Treatment / Treat']);
+  const treatmentNotes = cleanString(row['Treatment Notes']);
+  const growthType = cleanString(row['Growth Type']);
+  const origin = cleanString(row.Origin);
+
+  const searchValues = [
+    row['Stock #'],
+    status,
+    type,
+    row.Shape,
+    row.Color,
+    clarity,
+    cut,
+    lab,
+    treatment,
+    treatmentNotes,
+    growthType,
+    origin,
+    row['Item Location'],
+  ]
+    .map((value) => cleanString(value).toLowerCase())
+    .join(' ');
+
+  return {
+    id: cleanString(row['Stock #']),
+    status,
+    itemLocation: cleanString(row['Item Location']),
+    type,
+    lab,
+    reportNumber: cleanString(row['Report #']),
+    shape: cleanString(row.Shape),
+    carat: parseNumber(row.Carat) ?? 0,
+    color: cleanString(row.Color),
+    clarity,
+    cut,
+    treatment,
+    treatmentNotes,
+    growthType,
+    origin,
+    measurements: cleanString(row['Measurements (Meas)']),
+    ratio: parseNumber(row.Ratio),
+    totalPrice,
+    perCaratPrice,
+    isCallForPrice,
+    locationNotes: cleanString(row['Location Notes / Availability Notes']),
+    primaryImage,
+    otherImages,
+    images,
+    videoLink: cleanString(row['Video Link']),
+    searchBlob: searchValues,
+  };
+}
+
+function populateStaticFilters() {
+  renderCheckboxGroup(elements.typeFilterOptions, STONE_TYPES, 'type');
+  renderShapeOptions();
+  renderPresetOptions(elements.caratPresets, CARAT_PRESETS, 'carat');
+  renderPresetOptions(elements.pricePresets, PRICE_PRESETS, 'price');
+  renderClarityOptions();
+  renderCheckboxGroup(elements.cutFilterOptions, CUT_OPTIONS, 'cut');
+  renderCheckboxGroup(elements.labFilterOptions, LAB_OPTIONS, 'lab', true);
+  renderCheckboxGroup(elements.treatmentFilterOptions, TREATMENT_OPTIONS, 'treatment');
+  renderCheckboxGroup(elements.originFilterOptions, ORIGIN_OPTIONS, 'origin');
+  updateColorFilterOptions();
+}
+
+function renderCheckboxGroup(container, options, filterKey, includeLogo = false) {
+  if (!container) return;
+  container.innerHTML = '';
+
+  options.forEach((option) => {
+    const value = typeof option === 'string' ? option : option.value;
+    const label = typeof option === 'string' ? option : option.label;
+    const wrapper = document.createElement('label');
+    wrapper.innerHTML = `
+      <span class="label-text">
+        ${includeLogo ? `<span class="lab-icon" data-lab="${value}"></span>` : ''}
+        ${label}
+      </span>
+      <span class="count" data-count="${filterKey}-${value.replace(/\s+/g, '').toLowerCase()}">0</span>
+    `;
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.value = value;
+
+    input.addEventListener('change', () => {
+      const targetSet = state.filters[`${filterKey}s`] || state.filters[filterKey];
+      if (targetSet instanceof Set) {
+        if (input.checked) targetSet.add(value);
+        else targetSet.delete(value);
+      }
+      applyFilters();
+      if (filterKey === 'type') {
+        updateColorFilterOptions();
+        updateConditionalFilters();
+      }
+    });
+
+    wrapper.prepend(input);
+    container.appendChild(wrapper);
+  });
+}
+
+function renderShapeOptions() {
+  if (!elements.shapeFilterOptions) return;
+  elements.shapeFilterOptions.innerHTML = '';
+
+  SHAPE_OPTIONS.forEach(({ value, icon }) => {
+    const label = document.createElement('label');
+    label.innerHTML = `
+      <span class="shape-icon" aria-hidden="true">${icon}</span>
+      <span>${value}</span>
+      <span class="count" data-count="shape-${value.toLowerCase()}">0</span>
+    `;
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.value = value;
+
+    input.addEventListener('change', () => {
+      if (input.checked) state.filters.shapes.add(value);
+      else state.filters.shapes.delete(value);
+      applyFilters();
+    });
+
+    label.prepend(input);
+    elements.shapeFilterOptions.appendChild(label);
+  });
+}
+
+function renderPresetOptions(container, presets, key) {
+  if (!container) return;
+  container.innerHTML = '';
+
+  presets.forEach((preset) => {
+    const label = document.createElement('label');
+    label.dataset.preset = preset.id;
+    label.innerHTML = `
+      <span>${preset.label}</span>
+    `;
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.value = preset.id;
+
+    input.addEventListener('change', () => {
+      if (input.checked) {
+        applyPresetRange(key, preset.id);
+      } else {
+        clearPresetRange(key, preset.id);
+      }
+      applyFilters();
+    });
+
+    label.prepend(input);
+    container.appendChild(label);
+  });
+}
+
+function renderClarityOptions() {
+  if (!elements.clarityFilterOptions) return;
+  elements.clarityFilterOptions.innerHTML = '';
+
+  CLARITY_OPTIONS.forEach(({ value, label, description }) => {
+    const wrapper = document.createElement('label');
+    wrapper.innerHTML = `
+      <span>${label || value}</span>
+      <span class="count" data-count="clarity-${value.toLowerCase()}">0</span>
+    `;
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.value = value;
+    input.title = description || label || value;
+
+    input.addEventListener('change', () => {
+      if (input.checked) state.filters.clarities.add(value);
+      else state.filters.clarities.delete(value);
+      applyFilters();
+    });
+
+    wrapper.prepend(input);
+    elements.clarityFilterOptions.appendChild(wrapper);
+  });
+}
+
+function updateColorFilterOptions() {
+  if (!elements.colorFilterOptions) return;
+  const selectedTypes = state.filters.types;
+  const includesDiamond = selectedTypes.size === 0 || selectedTypes.has('Diamond');
+  const includesGemstones =
+    selectedTypes.size === 0 || Array.from(selectedTypes).some((type) => type !== 'Diamond');
+
+  elements.colorFilterOptions.innerHTML = '';
+
+  if (includesDiamond) {
+    const section = document.createElement('div');
+    section.className = 'color-section';
+    section.innerHTML = '<p class="color-heading">Diamond Color Scale</p>';
+    DIAMOND_COLORS.forEach((color) => {
+      const label = document.createElement('label');
+      label.innerHTML = `
+        <span class="color-chip" data-color="${color}">${color}</span>
+        <span class="count" data-count="color-${color.toLowerCase()}">0</span>
+      `;
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.value = color;
+      input.checked = state.filters.colors.has(color);
+      input.addEventListener('change', () => {
+        if (input.checked) state.filters.colors.add(color);
+        else state.filters.colors.delete(color);
+        applyFilters();
+      });
+      label.prepend(input);
+      section.appendChild(label);
+    });
+    elements.colorFilterOptions.appendChild(section);
+  }
+
+  if (includesGemstones) {
+    const section = document.createElement('div');
+    section.className = 'color-section';
+    section.innerHTML = '<p class="color-heading">Gemstone Color Palette</p>';
+    GEMSTONE_COLORS.forEach((color) => {
+      const label = document.createElement('label');
+      label.innerHTML = `
+        <span class="color-chip" data-color="${color}">${color}</span>
+        <span class="count" data-count="color-${color.toLowerCase().replace(/\s+/g, '')}">0</span>
+      `;
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.value = color;
+      input.checked = state.filters.colors.has(color);
+      input.addEventListener('change', () => {
+        if (input.checked) state.filters.colors.add(color);
+        else state.filters.colors.delete(color);
+        applyFilters();
+      });
+      label.prepend(input);
+      section.appendChild(label);
+    });
+    elements.colorFilterOptions.appendChild(section);
   }
 }
-function applyFilters(){
-  VIEW = ALL.filter(x =>
-    matchesText(x,state.q) &&
-    inSetOrAny(state.stone,x.stone) &&
-    inSetOrAny(state.color,x.color) &&
-    inSetOrAny(state.shape,x.shape) &&
-    inSetOrAny(state.clarity,x.clarity) &&
-    inSetOrAny(state.origin,x.origin) &&
-    inSetOrAny(state.shade,x.shade) &&
-    inSetOrAny(state.status,x.status) &&
-    inSetOrAny(state.certificate,x.certificate) &&
-    inSetOrAny(state.treatment,x.treatment) &&
-    inSetOrAny(state.pair,x.isPair) &&
-    passesRanges(x)
-  );
-  VIEW = sortView(VIEW);
-  syncSelectionsUI();   // <— update button/chip styles
-  renderPills();
-  writeURL();
-  renderGrid();
-}
 
-function writeURL(){
-  const p=new URLSearchParams();
-  if(state.q) p.set("q",state.q);
-  for(const k of ["stone","color","shape","clarity","origin","shade","status","certificate","treatment","pair"]){ if(state[k].size) p.set(k,[...state[k]].join(",")); }
-  if(state.minCt!=null) p.set("minCt",state.minCt);
-  if(state.maxCt!=null) p.set("maxCt",state.maxCt);
-  if(state.minTotal!=null) p.set("minTotal",state.minTotal);
-  if(state.maxTotal!=null) p.set("maxTotal",state.maxTotal);
-  if(state.qualityMin!=null) p.set("qmin",state.qualityMin);
-  if(state.qualityMax!=null) p.set("qmax",state.qualityMax);
-  if(state.sort && state.sort!=="featured") p.set("sort",state.sort);
-  if(state.page>1) p.set("page",state.page);
-  if(state.perPage!==24) p.set("pp",state.perPage);
-  const q=p.toString(); history.replaceState(null,"", q ? `?${q}` : location.pathname);
-}
-function readURL(){
-  const p=new URLSearchParams(location.search);
-  state.q=p.get("q")||""; Q("q") && (Q("q").value=state.q);
-  for(const k of ["stone","color","shape","clarity","origin","shade","status","certificate","treatment","pair"]){ const v=p.get(k); state[k]=new Set(v ? v.split(",") : []); }
-  state.minCt=parseNumber(p.get("minCt")); state.maxCt=parseNumber(p.get("maxCt"));
-  state.minTotal=parseNumber(p.get("minTotal")); state.maxTotal=parseNumber(p.get("maxTotal"));
-  state.qualityMin=parseNumber(p.get("qmin"))||1; state.qualityMax=parseNumber(p.get("qmax"))||5;
-  state.sort=p.get("sort")||"featured"; state.page=parseInt(p.get("page")||"1",10); state.perPage=parseInt(p.get("pp")||"24",10);
-  Q("sort") && (Q("sort").value=state.sort); Q("perPage") && (Q("perPage").value=String(state.perPage));
-  Q("qualityMin") && (Q("qualityMin").value=String(state.qualityMin)); Q("qualityMax") && (Q("qualityMax").value=String(state.qualityMax));
-}
+function applyPresetRange(type, presetId) {
+  const presets = type === 'carat' ? CARAT_PRESETS : PRICE_PRESETS;
+  const inputs = (type === 'carat' ? elements.caratPresets : elements.pricePresets)?.querySelectorAll('input');
+  if (!inputs) return;
 
-/* ----- RENDER ----- */
-function renderPills(){
-  const box=Q("activePills"); if(!box) return; box.innerHTML="";
-  const add=(label,val,unset)=>{ const span=document.createElement("span"); span.className="pill inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs border border-gray-300 bg-white"; span.innerHTML=`<span>${label}: <b>${val}</b></span> <button class="text-gray-400 hover:text-gray-600" aria-label="Remove">×</button>`; span.querySelector("button").addEventListener("click",unset); box.appendChild(span); };
-  if(state.q) add("Search",state.q,()=>{ state.q=""; Q("q")&&(Q("q").value=""); applyFilters(); });
-  for(const k of ["stone","color","shape","clarity","origin","shade","status","certificate","treatment","pair"]){ for(const val of state[k]) add(k[0].toUpperCase()+k.slice(1),val,()=>{ state[k].delete(val); applyFilters(); }); }
-  if(state.minCt!=null) add("Min ct",state.minCt,()=>{ state.minCt=null; ["minCt","caratMin","minCtM"].forEach(id=>Q(id)&&(Q(id).value="")); applyFilters(); });
-  if(state.maxCt!=null) add("Max ct",state.maxCt,()=>{ state.maxCt=null; ["maxCt","caratMax","maxCtM"].forEach(id=>Q(id)&&(Q(id).value="")); applyFilters(); });
-  if(state.minTotal!=null) add("Min $",state.minTotal,()=>{ state.minTotal=null; ["minTotal","priceMin","minTotalM"].forEach(id=>Q(id)&&(Q(id).value="")); applyFilters(); });
-  if(state.maxTotal!=null) add("Max $",state.maxTotal,()=>{ state.maxTotal=null; ["maxTotal","priceMax","maxTotalM"].forEach(id=>Q(id)&&(Q(id).value="")); applyFilters(); });
-}
-function renderGrid(){
-  const grid=Q("grid"); if(!grid) return; grid.innerHTML="";
-  const total=VIEW.length; Q("resultCount") && (Q("resultCount").textContent=total);
-  const pages=Math.max(1,Math.ceil(total/state.perPage)); state.page=Math.min(state.page,pages);
-  Q("page") && (Q("page").textContent=state.page); Q("pages") && (Q("pages").textContent=pages);
-  Q("prevPage") && (Q("prevPage").disabled=state.page<=1); Q("nextPage") && (Q("nextPage").disabled=state.page>=pages);
-  const start=(state.page-1)*state.perPage, end=start+state.perPage, slice=VIEW.slice(start,end);
-  const tpl=document.getElementById("cardTpl")?.content;
-  for(const x of slice){
-    const frag=tpl.cloneNode(true);
-    const card=frag.querySelector("[data-card]");
-    const img=frag.querySelector("img");
-    const firstMedia=(x.media && x.media[0]) || x.imageUrl;
-    img.src= firstMedia || `https://placehold.co/600x600?text=${encodeURIComponent(x.stone || "Gem")}`;
-    img.alt= `${x.stone || ""} ${x.color || ""} ${x.shape || ""}`.trim();
-    frag.querySelector('[data-badge="stone"]').textContent=x.stone||"";
-    const bc=frag.querySelector('[data-badge="color"]'); bc.querySelector('.swatch').style.background=colorHex(x.stone,x.color); bc.querySelector('[data-badge-label]').textContent=x.color||"—";
-    const a=frag.querySelector('[data-stock]'); a.textContent=x.stockId||x.originalId||"—"; a.href=firstMedia||"#";
-    frag.querySelector('[data-retail]').textContent=fmtMoney(x.retailPerCt)+" / ct";
-    frag.querySelector('[data-carat]').textContent=fmtCarat(x.caratTotal);
-    frag.querySelector('[data-shape]').textContent=x.shape||"—";
-    frag.querySelector('[data-clarity]').textContent=x.clarity||"—";
-    frag.querySelector('[data-origin]').textContent=[x.origin,x.shade].filter(Boolean).join(' · ');
-    frag.querySelector('[data-size]').textContent=[x.sizeMm,x.sizeRange].filter(Boolean).join(' | ');
-    card.addEventListener("click",(e)=>{ if(e.target.closest("a")) return; toggleDetails(card,x); });
-    frag.querySelector("[data-toggle]").addEventListener("click",(e)=>{ e.stopPropagation(); toggleDetails(card,x); });
-    grid.appendChild(frag);
+  const selectedValues = new Set();
+  inputs.forEach((input) => {
+    if (input.checked) selectedValues.add(input.value);
+  });
+
+  if (!selectedValues.size) {
+    resetRangeToDefaults(type);
+    return;
   }
-  if(!slice.length){
-    const empty=document.createElement("div"); empty.className="col-span-full text-center py-12 text-gray-500"; empty.innerHTML='<div class="text-lg font-medium">No matches</div><div class="text-sm">Try removing a filter or broadening your ranges.</div>'; grid.appendChild(empty);
+
+  let min = Infinity;
+  let max = -Infinity;
+
+  selectedValues.forEach((id) => {
+    const preset = presets.find((p) => p.id === id);
+    if (!preset) return;
+    const [presetMin, presetMax] = preset.range;
+    min = Math.min(min, presetMin);
+    max = Math.max(max, presetMax);
+  });
+
+  if (!Number.isFinite(min) || !Number.isFinite(max)) {
+    resetRangeToDefaults(type);
+    return;
+  }
+
+  if (type === 'carat') {
+    elements.caratRangeMin.value = min;
+    elements.caratRangeMax.value = max;
+    elements.caratMin.value = min.toFixed(2);
+    elements.caratMax.value = max.toFixed(2);
+    state.filters.carat = { min, max };
+  } else {
+    const clampedMax = Math.min(25000, max);
+    elements.priceRangeMin.value = min;
+    elements.priceRangeMax.value = clampedMax;
+    elements.priceMin.value = Math.round(min);
+    elements.priceMax.value = Math.round(clampedMax);
+    state.filters.price.min = min;
+    state.filters.price.max = clampedMax;
   }
 }
 
-/* ----- EVENTS ----- */
-Q("q")?.addEventListener("input",(e)=>{ state.q=e.target.value; state.page=1; applyFilters(); });
-Q("sort")?.addEventListener("change",(e)=>{ state.sort=e.target.value; applyFilters(); });
-Q("perPage")?.addEventListener("change",(e)=>{ state.perPage=parseInt(e.target.value,10); state.page=1; applyFilters(); });
-Q("prevPage")?.addEventListener("click",()=>{ state.page=Math.max(1,state.page-1); applyFilters(); });
-Q("nextPage")?.addEventListener("click",()=>{ state.page=state.page+1; applyFilters(); });
-Q("clearAll")?.addEventListener("click",()=>{ state.q=""; Q("q")&&(Q("q").value=""); for(const k of ["stone","color","shape","clarity","origin","shade","status","certificate","treatment","pair"]) state[k].clear(); ["minCt","maxCt","minTotal","maxTotal","caratMin","caratMax","priceMin","priceMax","minCtM","maxCtM","minTotalM","maxTotalM"].forEach(id=>Q(id)&&(Q(id).value="")); state.minCt=state.maxCt=state.minTotal=state.maxTotal=null; state.qualityMin=1; state.qualityMax=5; state.sort="featured"; Q("sort") && (Q("sort").value="featured"); state.page=1; applyFilters(); });
-Q("refreshBtn")?.addEventListener("click",()=>loadData());
+function clearPresetRange(type, presetId) {
+  const presets = type === 'carat' ? CARAT_PRESETS : PRICE_PRESETS;
+  const inputs = (type === 'carat' ? elements.caratPresets : elements.pricePresets)?.querySelectorAll('input');
+  if (!inputs) return;
 
-const bind=(id,fn)=>{ const el=Q(id); if(el) el.addEventListener("change",fn); };
-bind("priceMin",()=>{ state.minTotal=parseNumber(Q("priceMin").value); state.page=1; applyFilters(); });
-bind("priceMax",()=>{ state.maxTotal=parseNumber(Q("priceMax").value); state.page=1; applyFilters(); });
-bind("caratMin",()=>{ state.minCt=parseNumber(Q("caratMin").value); state.page=1; applyFilters(); });
-bind("caratMax",()=>{ state.maxCt=parseNumber(Q("caratMax").value); state.page=1; applyFilters(); });
-bind("qualityMin",()=>{ state.qualityMin=parseNumber(Q("qualityMin").value)||1; state.page=1; applyFilters(); });
-bind("qualityMax",()=>{ state.qualityMax=parseNumber(Q("qualityMax").value)||5; state.page=1; applyFilters(); });
-bind("selOrigin",()=>{ const v=Q("selOrigin").value; state.origin=new Set(v?[v]:[]); state.page=1; applyFilters(); });
-bind("selClarity",()=>{ const v=Q("selClarity").value; state.clarity=new Set(v?[v]:[]); state.page=1; applyFilters(); });
-bind("selTreatment",()=>{ const v=Q("selTreatment").value; state.treatment=new Set(v?[v]:[]); state.page=1; applyFilters(); });
-bind("selCert",()=>{ const v=Q("selCert").value; state.certificate=new Set(v?[v]:[]); state.page=1; applyFilters(); });
-bind("selPair",()=>{ const v=Q("selPair").value; state.pair=new Set(v?[v]:[]); state.page=1; applyFilters(); });
+  const selectedValues = new Set();
+  inputs.forEach((input) => {
+    if (input.checked) selectedValues.add(input.value);
+  });
 
-/* Mobile bottom sheet */
-function openSheet(){ const sh=Q("mobileSheet"); if(!sh) return; sh.classList.remove("hidden"); document.body.classList.add("overflow-hidden"); }
-function closeSheet(){ const sh=Q("mobileSheet"); if(!sh) return; sh.classList.add("hidden"); document.body.classList.remove("overflow-hidden"); }
-Q("mobileFiltersBtn")?.addEventListener("click",openSheet);
-Q("mobileClose")?.addEventListener("click",closeSheet);
-Q("mobileSheet")?.querySelector("[data-close]")?.addEventListener("click",closeSheet);
-Q("mobileApply")?.addEventListener("click",()=>{ closeSheet(); });
-Q("mobileClear")?.addEventListener("click",()=>{ Q("clearAll")?.click(); });
+  if (!selectedValues.size) {
+    resetRangeToDefaults(type);
+    return;
+  }
 
-/* ----- BOOT ----- */
-(function boot(){ try{ window.feather && window.feather.replace(); }catch(_){} loadData(); })();
+  applyPresetRange(type, presetId);
+}
+
+function resetRangeToDefaults(type) {
+  if (type === 'carat') {
+    elements.caratRangeMin.value = 0.5;
+    elements.caratRangeMax.value = 10;
+    elements.caratMin.value = '0.50';
+    elements.caratMax.value = '10.00';
+    state.filters.carat = { min: 0.5, max: 10 };
+  } else {
+    elements.priceRangeMin.value = 0;
+    elements.priceRangeMax.value = 20000;
+    elements.priceMin.value = '0';
+    elements.priceMax.value = '20000';
+    state.filters.price.min = 0;
+    state.filters.price.max = 20000;
+  }
+}
+
+function updateConditionalFilters() {
+  const selectedTypes = state.filters.types;
+  const isDiamondOnly = selectedTypes.size === 0 || (selectedTypes.size === 1 && selectedTypes.has('Diamond'));
+  const includesDiamonds = selectedTypes.size === 0 || selectedTypes.has('Diamond');
+  const includesGemstones =
+    selectedTypes.size === 0 || Array.from(selectedTypes).some((type) => type !== 'Diamond');
+
+  if (elements.filterSections.clarity) {
+    elements.filterSections.clarity.classList.toggle('hidden', !includesDiamonds);
+  }
+
+  if (elements.filterSections.growth) {
+    elements.filterSections.growth.classList.toggle('hidden', !includesDiamonds);
+  }
+
+  if (elements.filterSections.origin) {
+    elements.filterSections.origin.classList.toggle('hidden', !includesGemstones);
+  }
+
+  if (!includesDiamonds) {
+    state.filters.clarities.clear();
+    elements.clarityFilterOptions?.querySelectorAll('input').forEach((input) => {
+      input.checked = false;
+    });
+    if (state.filters.growth !== 'all') {
+      state.filters.growth = 'all';
+      elements.growthFilterOptions?.querySelectorAll('input').forEach((input) => {
+        input.checked = input.value === 'all';
+      });
+    }
+  }
+
+  if (!includesGemstones) {
+    state.filters.origins.clear();
+    elements.originFilterOptions?.querySelectorAll('input').forEach((input) => {
+      input.checked = false;
+    });
+  }
+}
+
+function applyFilters() {
+  const searchTerm = state.searchTerm;
+  const { filters } = state;
+
+  const filtered = state.inventory.filter((item) => {
+    if (filters.status !== 'all' && item.status !== filters.status) return false;
+
+    if (filters.types.size && !filters.types.has(item.type)) return false;
+
+    if (filters.shapes.size && !filters.shapes.has(item.shape)) return false;
+
+    if (item.carat < filters.carat.min || item.carat > filters.carat.max) return false;
+
+    if (filters.colors.size && !filters.colors.has(item.color)) return false;
+
+    if (filters.clarities.size && (!item.clarity || !filters.clarities.has(item.clarity))) return false;
+
+    if (filters.cuts.size && (!item.cut || !filters.cuts.has(item.cut))) return false;
+
+    const itemLab = item.lab || 'None';
+    if (filters.labs.size && !filters.labs.has(itemLab)) return false;
+
+    if (!item.isCallForPrice) {
+      const price = item.totalPrice ?? Infinity;
+      if (price < filters.price.min || price > filters.price.max) return false;
+    } else if (!filters.price.includeCall) {
+      return false;
+    }
+
+    if (filters.treatments.size && (!item.treatment || !filters.treatments.has(item.treatment))) return false;
+
+    if (filters.growth === 'natural' && (item.type !== 'Diamond' || item.growthType)) return false;
+    if (filters.growth === 'lab' && (item.type !== 'Diamond' || !item.growthType)) return false;
+
+    if (filters.origins.size && (!item.origin || !filters.origins.has(item.origin))) return false;
+
+    if (searchTerm && !item.searchBlob.includes(searchTerm)) return false;
+
+    return true;
+  });
+
+  state.filteredInventory = sortInventory(filtered);
+
+  updateResultsCounts();
+  renderProducts();
+  renderActiveFilterChips();
+  updateFilterCounts();
+}
+
+function sortInventory(list) {
+  const sorted = [...list];
+  switch (state.sortBy) {
+    case 'price-asc':
+      sorted.sort((a, b) => priceValue(a) - priceValue(b));
+      break;
+    case 'price-desc':
+      sorted.sort((a, b) => priceValue(b) - priceValue(a));
+      break;
+    case 'carat-asc':
+      sorted.sort((a, b) => a.carat - b.carat);
+      break;
+    case 'carat-desc':
+      sorted.sort((a, b) => b.carat - a.carat);
+      break;
+    case 'stock-asc':
+      sorted.sort((a, b) => a.id.localeCompare(b.id));
+      break;
+    case 'recent':
+    default:
+      // Keep original order (assuming CSV order is newest first)
+      sorted.sort((a, b) => state.inventory.indexOf(a) - state.inventory.indexOf(b));
+      break;
+  }
+  return sorted;
+}
+
+function priceValue(item) {
+  if (item.isCallForPrice || item.totalPrice === null) {
+    return Infinity;
+  }
+  return item.totalPrice;
+}
+
+function updateResultsCounts() {
+  const visible = state.filteredInventory.length;
+  elements.visibleCount.textContent = visible;
+  elements.resultsVisible.textContent = visible;
+  elements.filterResultCount.textContent = visible;
+}
+
+function renderProducts() {
+  if (!elements.productGrid) return;
+  elements.productGrid.innerHTML = '';
+
+  const fragment = document.createDocumentFragment();
+
+  state.filteredInventory.forEach((item) => {
+    const isExpanded = item.id === state.expandedId;
+    const card = isExpanded ? buildExpandedCard(item) : buildCompactCard(item);
+    fragment.appendChild(card);
+  });
+
+  elements.productGrid.appendChild(fragment);
+
+  if (state.expandedId) {
+    const expandedCard = elements.productGrid.querySelector('.expanded-card');
+    if (expandedCard) {
+      scrollIntoView(expandedCard);
+    }
+  }
+}
+
+function buildCompactCard(item) {
+  const card = document.createElement('article');
+  card.className = 'product-card';
+  if (item.status === 'Sold') card.classList.add('sold');
+  card.dataset.productId = item.id;
+
+  const badgeKey = statusKey(item.status);
+  const statusBadge = document.createElement('div');
+  statusBadge.className = 'status-badge';
+  statusBadge.classList.add(`status-${badgeKey}`);
+  statusBadge.textContent = item.status;
+  card.appendChild(statusBadge);
+
+  const media = document.createElement('div');
+  media.className = 'product-media';
+  if (item.images.length) {
+    const img = document.createElement('img');
+    img.src = item.images[0];
+    img.alt = `${item.type} ${item.shape} ${item.carat.toFixed(2)}ct`;
+    img.loading = 'lazy';
+    media.appendChild(img);
+
+    if (item.images.length > 1) {
+      const indicator = document.createElement('div');
+      indicator.className = 'gallery-indicator';
+      indicator.textContent = '●'.repeat( Math.min(item.images.length, 5) );
+      media.appendChild(indicator);
+    }
+  } else {
+    const placeholder = document.createElement('div');
+    const meta = PLACEHOLDER_META[item.type] || PLACEHOLDER_META.Default;
+    placeholder.className = 'media-placeholder';
+    placeholder.style.background = meta.gradient;
+    placeholder.innerHTML = `
+      <span class="icon">${meta.icon}</span>
+      <span>${item.type || 'Gemstone'}</span>
+    `;
+    media.appendChild(placeholder);
+  }
+
+  if (item.videoLink) {
+    const badge = document.createElement('div');
+    badge.className = 'video-badge';
+    badge.innerHTML = '<span aria-hidden="true">🎥</span> Video';
+    media.appendChild(badge);
+  }
+
+  card.appendChild(media);
+
+  const body = document.createElement('div');
+  body.className = 'product-body';
+  body.innerHTML = `
+    <div class="stock-number">Stock # ${item.id}</div>
+    <h3 class="product-title">${item.carat.toFixed(2)}ct ${item.shape || ''} ${item.type}</h3>
+    <div class="product-specs">
+      ${item.color ? `<span>Color: ${item.color}</span>` : ''}
+      ${item.clarity ? `<span>Clarity: ${item.clarity}</span>` : ''}
+      ${item.cut ? `<span>Cut: ${item.cut}</span>` : ''}
+    </div>
+    ${item.lab ? `<span class="certification-tag">⭐ ${item.lab} Certified</span>` : ''}
+    <div class="price-section">
+      ${renderPriceSnippet(item)}
+    </div>
+    <div class="location-info">📍 ${item.itemLocation || 'Global'}</div>
+  `;
+
+  const actions = document.createElement('div');
+  actions.className = 'card-actions';
+  const button = document.createElement('button');
+  button.className = 'btn-view-details';
+  button.type = 'button';
+  button.innerHTML = '<span>View Details</span>';
+  button.addEventListener('click', () => {
+    toggleExpandedCard(item.id);
+  });
+  actions.appendChild(button);
+
+  body.appendChild(actions);
+  card.appendChild(body);
+
+  return card;
+}
+
+function buildExpandedCard(item) {
+  const container = document.createElement('article');
+  container.className = 'expanded-card';
+  container.dataset.productId = item.id;
+
+  const left = document.createElement('div');
+  left.className = 'expanded-left';
+  left.appendChild(buildMediaGallery(item));
+  if (item.videoLink) {
+    left.appendChild(buildVideoPlayer(item.videoLink));
+  } else {
+    left.appendChild(buildVideoPlaceholder());
+  }
+  left.appendChild(build360Button());
+
+  const right = document.createElement('div');
+  right.className = 'expanded-right';
+  right.appendChild(buildExpandedHeader(item));
+  right.appendChild(buildCertificationSection(item));
+  right.appendChild(buildSpecificationTable(item));
+  right.appendChild(buildTreatmentSection(item));
+  right.appendChild(buildPricingSection(item));
+  right.appendChild(buildLocationSection(item));
+  right.appendChild(buildActionButtons());
+
+  container.appendChild(left);
+  container.appendChild(right);
+
+  return container;
+}
+
+function buildExpandedHeader(item) {
+  const header = document.createElement('div');
+  header.className = 'expanded-header';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'close-btn';
+  closeBtn.type = 'button';
+  closeBtn.setAttribute('aria-label', 'Collapse details');
+  closeBtn.innerHTML = '&times;';
+  closeBtn.addEventListener('click', () => toggleExpandedCard(null));
+  header.appendChild(closeBtn);
+
+  const stockInfo = document.createElement('div');
+  stockInfo.className = 'stock-info';
+  stockInfo.textContent = `Stock # ${item.id}`;
+  header.appendChild(stockInfo);
+
+  const title = document.createElement('h2');
+  title.className = 'product-title';
+  title.textContent = `${item.carat.toFixed(2)} Carat ${item.shape} ${item.type}`;
+  header.appendChild(title);
+
+  const specs = document.createElement('div');
+  specs.className = 'quick-specs';
+  specs.innerHTML = `
+    ${item.color ? `<span class="spec">Color: ${item.color}</span>` : ''}
+    ${item.clarity ? `<span class="separator">•</span><span class="spec">Clarity: ${item.clarity}</span>` : ''}
+    ${item.cut ? `<span class="separator">•</span><span class="spec">Cut: ${item.cut}</span>` : ''}
+  `;
+  header.appendChild(specs);
+
+  const status = document.createElement('div');
+  status.className = 'status-large';
+  status.classList.add(statusKey(item.status));
+  status.textContent = statusDescription(item.status);
+  header.appendChild(status);
+
+  return header;
+}
+
+function buildMediaGallery(item) {
+  const gallery = document.createElement('div');
+  gallery.className = 'image-gallery';
+
+  const main = document.createElement('div');
+  main.className = 'main-image';
+
+  let imageIndex = 0;
+  const mainImage = document.createElement('img');
+  if (item.images.length) {
+    mainImage.src = item.images[0];
+    mainImage.alt = `${item.type} ${item.shape}`;
+  } else {
+    const meta = PLACEHOLDER_META[item.type] || PLACEHOLDER_META.Default;
+    main.style.background = meta.gradient;
+  }
+  main.appendChild(mainImage);
+
+  if (item.images.length) {
+    const zoomOverlay = document.createElement('div');
+    zoomOverlay.className = 'zoom-overlay';
+    zoomOverlay.textContent = '🔍 Click to zoom';
+    main.appendChild(zoomOverlay);
+    main.addEventListener('click', () => {
+      openLightbox(item.images[imageIndex], `${item.type} ${item.shape}`);
+    });
+  }
+
+  const nav = document.createElement('div');
+  nav.className = 'gallery-nav';
+  const prev = document.createElement('button');
+  prev.type = 'button';
+  prev.textContent = '◄';
+  prev.addEventListener('click', () => {
+    imageIndex = (imageIndex - 1 + item.images.length) % item.images.length;
+    mainImage.src = item.images[imageIndex];
+    updateActiveThumb();
+    counter.textContent = `${imageIndex + 1} / ${item.images.length}`;
+  });
+  const next = document.createElement('button');
+  next.type = 'button';
+  next.textContent = '►';
+  next.addEventListener('click', () => {
+    imageIndex = (imageIndex + 1) % item.images.length;
+    mainImage.src = item.images[imageIndex];
+    updateActiveThumb();
+    counter.textContent = `${imageIndex + 1} / ${item.images.length}`;
+  });
+  nav.appendChild(prev);
+  nav.appendChild(next);
+  if (item.images.length > 1) main.appendChild(nav);
+
+  const counter = document.createElement('span');
+  counter.className = 'image-counter';
+  counter.textContent = item.images.length ? `1 / ${item.images.length}` : '1 / 1';
+  if (item.images.length > 1) main.appendChild(counter);
+
+  gallery.appendChild(main);
+
+  const thumbs = document.createElement('div');
+  thumbs.className = 'thumbnail-strip';
+  if (item.images.length) {
+    item.images.forEach((imgSrc, index) => {
+      const thumb = document.createElement('img');
+      thumb.src = imgSrc;
+      thumb.alt = `${item.type} thumbnail ${index + 1}`;
+      if (index === 0) thumb.classList.add('active');
+      thumb.addEventListener('click', () => {
+        imageIndex = index;
+        mainImage.src = imgSrc;
+        updateActiveThumb();
+        counter.textContent = `${index + 1} / ${item.images.length}`;
+      });
+      thumbs.appendChild(thumb);
+    });
+  } else {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'media-placeholder';
+    const meta = PLACEHOLDER_META[item.type] || PLACEHOLDER_META.Default;
+    placeholder.style.background = meta.gradient;
+    placeholder.innerHTML = `
+      <span class="icon">${meta.icon}</span>
+      <span>${item.type}</span>
+    `;
+    thumbs.appendChild(placeholder);
+  }
+
+  const updateActiveThumb = () => {
+    thumbs.querySelectorAll('img').forEach((thumb, idx) => {
+      thumb.classList.toggle('active', idx === imageIndex);
+    });
+  };
+
+  gallery.appendChild(thumbs);
+  return gallery;
+}
+
+function buildVideoPlayer(url) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'video-player';
+  wrapper.innerHTML = '<h4>Product Video</h4>';
+
+  const embedUrl = getEmbedUrl(url);
+
+  if (embedUrl.type === 'iframe') {
+    const iframe = document.createElement('iframe');
+    iframe.src = embedUrl.url;
+    iframe.width = '100%';
+    iframe.height = '315';
+    iframe.frameBorder = '0';
+    iframe.allowFullscreen = true;
+    iframe.setAttribute('loading', 'lazy');
+    wrapper.appendChild(iframe);
+  } else {
+    const video = document.createElement('video');
+    video.controls = true;
+    video.width = '100%';
+    const source = document.createElement('source');
+    source.src = url;
+    source.type = embedUrl.mime || 'video/mp4';
+    video.appendChild(source);
+    video.textContent = "Your browser doesn't support video playback.";
+    wrapper.appendChild(video);
+  }
+
+  return wrapper;
+}
+
+function buildVideoPlaceholder() {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'video-player';
+  wrapper.innerHTML = `
+    <h4>Product Video</h4>
+    <div class="media-placeholder" style="padding: 24px; background: rgba(26,31,54,0.05); border-radius: 16px;">
+      <span class="icon">🎥</span>
+      <span>Video not available yet</span>
+    </div>
+  `;
+  return wrapper;
+}
+
+function build360Button() {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'view-360';
+  wrapper.innerHTML = `
+    <button class="btn-360" type="button" disabled>
+      🔄 360° View
+      <span class="coming-soon">Coming Soon</span>
+    </button>
+  `;
+  return wrapper;
+}
+
+function buildCertificationSection(item) {
+  const section = document.createElement('section');
+  section.className = 'certification-section';
+
+  const header = document.createElement('div');
+  header.className = 'cert-header';
+
+  const logo = document.createElement('div');
+  logo.className = 'lab-logo';
+  logo.textContent = item.lab ? item.lab.slice(0, 3).toUpperCase() : '—';
+  header.appendChild(logo);
+
+  const info = document.createElement('div');
+  info.className = 'cert-info';
+  info.innerHTML = `
+    <strong>${item.lab || 'Uncertified'}</strong>
+    ${item.reportNumber ? `<span class="cert-number">Report #: ${item.reportNumber}</span>` : ''}
+  `;
+  header.appendChild(info);
+
+  section.appendChild(header);
+
+  if (item.lab && LAB_LINKS[item.lab] && item.reportNumber) {
+    const button = document.createElement('button');
+    button.className = 'btn-view-cert';
+    button.type = 'button';
+    button.textContent = '📄 View Certificate';
+    button.addEventListener('click', () => {
+      const url = `${LAB_LINKS[item.lab]}${encodeURIComponent(item.reportNumber)}`;
+      window.open(url, '_blank', 'noopener');
+    });
+    section.appendChild(button);
+  } else {
+    const note = document.createElement('div');
+    note.className = 'cert-note';
+    note.textContent = item.lab ? 'Certificate available on request.' : 'No certification on file.';
+    section.appendChild(note);
+  }
+
+  return section;
+}
+
+function buildSpecificationTable(item) {
+  const section = document.createElement('section');
+  section.className = 'specifications';
+  section.innerHTML = '<h3>Detailed Specifications</h3>';
+
+  const table = document.createElement('table');
+  table.className = 'spec-table';
+
+  const rows = [
+    ['Type', item.type],
+    ['Shape', item.shape],
+    ['Carat Weight', `${item.carat.toFixed(2)} ct`],
+    ['Color Grade', withOptionalSwatch(item.color)],
+    ['Clarity Grade', item.clarity || '—'],
+    ['Cut Quality', item.cut || '—'],
+    ['Measurements', item.measurements || '—'],
+    ['Length/Width Ratio', item.ratio ? item.ratio.toFixed(2) : '—'],
+    ['Growth Method', item.growthType || (item.type === 'Diamond' ? 'Natural' : '—')],
+    ['Origin', item.origin || '—'],
+  ];
+
+  rows.forEach(([label, value]) => {
+    if (!value || value === '—') {
+      if (label === 'Growth Method' && item.type !== 'Diamond') return;
+      if (label === 'Origin' && (!item.origin || item.type === 'Diamond')) return;
+    }
+    const row = document.createElement('tr');
+    const labelCell = document.createElement('td');
+    labelCell.className = 'spec-label';
+    labelCell.textContent = label;
+    const valueCell = document.createElement('td');
+    valueCell.className = 'spec-value';
+    valueCell.innerHTML = value || '—';
+    row.appendChild(labelCell);
+    row.appendChild(valueCell);
+    table.appendChild(row);
+  });
+
+  section.appendChild(table);
+  return section;
+}
+
+function buildTreatmentSection(item) {
+  const section = document.createElement('section');
+  section.className = 'treatment-section';
+  section.innerHTML = '<h3>Treatment Details</h3>';
+
+  const detail = document.createElement('p');
+  const treatment = item.treatment || 'None';
+  const notes = item.treatmentNotes || (treatment === 'None' ? 'No treatments detected.' : 'Documentation on file.');
+  detail.innerHTML = `<strong>${treatment}</strong> &mdash; ${notes}`;
+  section.appendChild(detail);
+
+  return section;
+}
+
+function buildPricingSection(item) {
+  const section = document.createElement('section');
+  section.className = 'pricing-section';
+  section.innerHTML = `
+    <h3>Pricing</h3>
+    <div class="pricing-main">${item.isCallForPrice ? 'Call For Price' : formatPrice(item.totalPrice)}</div>
+    <div class="pricing-note">Per Carat: ${item.perCaratPrice ? formatPrice(item.perCaratPrice) : 'Contact us for per-carat pricing'}</div>
+  `;
+
+  return section;
+}
+
+function buildLocationSection(item) {
+  const section = document.createElement('section');
+  section.className = 'location-section';
+  section.innerHTML = `
+    <h3>Location & Availability</h3>
+    <p>📍 ${item.itemLocation || 'Global availability'}</p>
+    ${item.locationNotes ? `<p>🔒 ${item.locationNotes}</p>` : ''}
+    <p>✓ ${availabilityMessage(item.status)}</p>
+  `;
+
+  return section;
+}
+
+function buildActionButtons() {
+  const section = document.createElement('div');
+  section.className = 'action-buttons';
+
+  const buttons = [
+    { label: '📞 Request Quote', type: 'primary' },
+    { label: '📧 Contact Us', type: 'outline' },
+    { label: '♡ Add to Wishlist', type: 'outline' },
+    { label: '📤 Share', type: 'outline' },
+  ];
+
+  buttons.forEach((btn) => {
+    const button = document.createElement('button');
+    button.className = btn.type === 'primary' ? 'btn' : 'btn-outline';
+    button.type = 'button';
+    button.textContent = btn.label;
+    button.addEventListener('click', () => showComingSoon('This feature is coming soon!'));
+    section.appendChild(button);
+  });
+
+  return section;
+}
+
+function renderPriceSnippet(item) {
+  if (item.isCallForPrice) {
+    return `
+      <div class="price-total">Call For Price</div>
+      <div class="price-per-carat">Contact us for pricing details.</div>
+    `;
+  }
+  const perCaratDisplay = item.perCaratPrice ? `${formatPrice(item.perCaratPrice)} per carat` : 'Contact for per-carat pricing';
+  return `
+    <div class="price-total">${formatPrice(item.totalPrice)}</div>
+    <div class="price-per-carat">${perCaratDisplay}</div>
+  `;
+}
+
+function renderActiveFilterChips() {
+  if (!elements.activeFilterChips) return;
+  elements.activeFilterChips.innerHTML = '';
+
+  const chips = [];
+
+  if (state.searchTerm) {
+    chips.push(createChip('Search', state.searchTerm, () => {
+      state.searchTerm = '';
+      syncHeaderSearch('');
+      syncQuickSearch('');
+      applyFilters();
+    }));
+  }
+
+  if (state.filters.status !== 'all') {
+    chips.push(createChip('Status', state.filters.status, () => {
+      state.filters.status = 'all';
+      document.querySelector('input[name="status"][value="all"]').checked = true;
+      applyFilters();
+    }));
+  }
+
+  if (state.filters.types.size) {
+    state.filters.types.forEach((type) => {
+      chips.push(createChip('Type', type, () => {
+        state.filters.types.delete(type);
+        elements.typeFilterOptions?.querySelectorAll('input').forEach((input) => {
+          if (input.value === type) input.checked = false;
+        });
+        applyFilters();
+        updateColorFilterOptions();
+        updateConditionalFilters();
+      }));
+    });
+  }
+
+  if (state.filters.shapes.size) {
+    state.filters.shapes.forEach((shape) => {
+      chips.push(createChip('Shape', shape, () => {
+        state.filters.shapes.delete(shape);
+        elements.shapeFilterOptions?.querySelectorAll('input').forEach((input) => {
+          if (input.value === shape) input.checked = false;
+        });
+        applyFilters();
+      }));
+    });
+  }
+
+  if (state.filters.colors.size) {
+    state.filters.colors.forEach((color) => {
+      chips.push(createChip('Color', color, () => {
+        state.filters.colors.delete(color);
+        elements.colorFilterOptions?.querySelectorAll('input').forEach((input) => {
+          if (input.value === color) input.checked = false;
+        });
+        applyFilters();
+      }));
+    });
+  }
+
+  if (state.filters.clarities.size) {
+    state.filters.clarities.forEach((clarity) => {
+      chips.push(createChip('Clarity', clarity, () => {
+        state.filters.clarities.delete(clarity);
+        elements.clarityFilterOptions?.querySelectorAll('input').forEach((input) => {
+          if (input.value === clarity) input.checked = false;
+        });
+        applyFilters();
+      }));
+    });
+  }
+
+  if (state.filters.cuts.size) {
+    state.filters.cuts.forEach((cut) => {
+      chips.push(createChip('Cut', cut, () => {
+        state.filters.cuts.delete(cut);
+        elements.cutFilterOptions?.querySelectorAll('input').forEach((input) => {
+          if (input.value === cut) input.checked = false;
+        });
+        applyFilters();
+      }));
+    });
+  }
+
+  if (state.filters.labs.size) {
+    state.filters.labs.forEach((lab) => {
+      chips.push(createChip('Lab', lab, () => {
+        state.filters.labs.delete(lab);
+        elements.labFilterOptions?.querySelectorAll('input').forEach((input) => {
+          if (input.value === lab) input.checked = false;
+        });
+        applyFilters();
+      }));
+    });
+  }
+
+  if (state.filters.treatments.size) {
+    state.filters.treatments.forEach((treatment) => {
+      chips.push(createChip('Treatment', treatment, () => {
+        state.filters.treatments.delete(treatment);
+        elements.treatmentFilterOptions?.querySelectorAll('input').forEach((input) => {
+          if (input.value === treatment) input.checked = false;
+        });
+        applyFilters();
+      }));
+    });
+  }
+
+  if (state.filters.origins.size) {
+    state.filters.origins.forEach((origin) => {
+      chips.push(createChip('Origin', origin, () => {
+        state.filters.origins.delete(origin);
+        elements.originFilterOptions?.querySelectorAll('input').forEach((input) => {
+          if (input.value === origin) input.checked = false;
+        });
+        applyFilters();
+      }));
+    });
+  }
+
+  if (state.filters.growth !== 'all') {
+    const label = state.filters.growth === 'natural' ? 'Natural Diamonds' : 'Lab-Grown Diamonds';
+    chips.push(createChip('Growth', label, () => {
+      state.filters.growth = 'all';
+      elements.growthFilterOptions?.querySelectorAll('input').forEach((input) => {
+        input.checked = input.value === 'all';
+      });
+      applyFilters();
+    }));
+  }
+
+  if (state.filters.carat.min !== 0.5 || state.filters.carat.max !== 10) {
+    chips.push(createChip('Carat', `${state.filters.carat.min.toFixed(2)} - ${state.filters.carat.max.toFixed(2)}ct`, () => {
+      resetRangeToDefaults('carat');
+      elements.caratPresets?.querySelectorAll('input').forEach((input) => {
+        input.checked = false;
+      });
+      applyFilters();
+    }));
+  }
+
+  const defaultPriceRange = state.filters.price.min === 0 && state.filters.price.max === 20000;
+  if (!defaultPriceRange) {
+    const priceText = `${formatPrice(state.filters.price.min)} - ${formatPrice(state.filters.price.max)}`;
+    chips.push(createChip('Price', priceText, () => {
+      resetRangeToDefaults('price');
+      elements.pricePresets?.querySelectorAll('input').forEach((input) => {
+        input.checked = false;
+      });
+      applyFilters();
+    }));
+  }
+
+  if (!state.filters.price.includeCall) {
+    chips.push(createChip('Price', 'Hide “Call For Price”', () => {
+      state.filters.price.includeCall = true;
+      if (elements.priceCallOption) elements.priceCallOption.checked = true;
+      applyFilters();
+    }));
+  }
+
+  chips.forEach((chip) => elements.activeFilterChips.appendChild(chip));
+  elements.activeFilterCount.textContent = chips.length;
+}
+
+function createChip(label, value, onRemove) {
+  const chip = document.createElement('span');
+  chip.className = 'filter-chip';
+  chip.innerHTML = `<span>${label}: ${value}</span>`;
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.setAttribute('aria-label', `Remove ${label} filter`);
+  button.innerHTML = '&times;';
+  button.addEventListener('click', onRemove);
+
+  chip.appendChild(button);
+  return chip;
+}
+
+function updateFilterCounts() {
+  const counts = {
+    status: { all: state.inventory.length, Available: 0, 'On Hold': 0, Sold: 0 },
+    type: {},
+    shape: {},
+    color: {},
+    clarity: {},
+    cut: {},
+    lab: {},
+    treatment: {},
+    origin: {},
+  };
+
+  state.inventory.forEach((item) => {
+    counts.status[item.status] = (counts.status[item.status] || 0) + 1;
+    counts.type[item.type] = (counts.type[item.type] || 0) + 1;
+    counts.shape[item.shape] = (counts.shape[item.shape] || 0) + 1;
+    if (item.color) counts.color[item.color] = (counts.color[item.color] || 0) + 1;
+    if (item.clarity) counts.clarity[item.clarity] = (counts.clarity[item.clarity] || 0) + 1;
+    if (item.cut) counts.cut[item.cut] = (counts.cut[item.cut] || 0) + 1;
+    const lab = item.lab || 'None';
+    counts.lab[lab] = (counts.lab[lab] || 0) + 1;
+    if (item.treatment) counts.treatment[item.treatment] = (counts.treatment[item.treatment] || 0) + 1;
+    if (item.origin) counts.origin[item.origin] = (counts.origin[item.origin] || 0) + 1;
+  });
+
+  if (elements.statusCounts) {
+    elements.statusCounts.all.textContent = counts.status.all;
+    elements.statusCounts.available.textContent = counts.status.Available || 0;
+    elements.statusCounts.hold.textContent = counts.status['On Hold'] || 0;
+    elements.statusCounts.sold.textContent = counts.status.Sold || 0;
+  }
+
+  updateCountElements('type', counts.type);
+  updateCountElements('shape', counts.shape);
+  updateCountElements('color', counts.color, true);
+  updateCountElements('clarity', counts.clarity);
+  updateCountElements('cut', counts.cut);
+  updateCountElements('lab', counts.lab);
+  updateCountElements('treatment', counts.treatment);
+  updateCountElements('origin', counts.origin, true);
+}
+
+function updateCountElements(prefix, data, sanitize = false) {
+  Object.entries(data).forEach(([key, value]) => {
+    const baseKey = key.toLowerCase();
+    const attrKey = sanitize ? baseKey.replace(/\s+/g, '') : baseKey;
+    const selector = `[data-count="${prefix}-${attrKey}"]`;
+    const element = document.querySelector(selector);
+    if (element) element.textContent = value;
+  });
+}
+
+function clearAllFilters() {
+  state.filters.status = 'all';
+  state.filters.types.clear();
+  state.filters.shapes.clear();
+  state.filters.colors.clear();
+  state.filters.clarities.clear();
+  state.filters.cuts.clear();
+  state.filters.labs.clear();
+  state.filters.treatments.clear();
+  state.filters.origins.clear();
+  state.filters.growth = 'all';
+  state.filters.carat = { min: 0.5, max: 10 };
+  state.filters.price = { min: 0, max: 20000, includeCall: true };
+  state.searchTerm = '';
+  state.expandedId = null;
+
+  document.querySelectorAll('.filter-section input').forEach((input) => {
+    if (input.type === 'checkbox') input.checked = false;
+    if (input.type === 'radio') input.checked = input.value === 'all';
+  });
+
+  resetRangeToDefaults('carat');
+  resetRangeToDefaults('price');
+  if (elements.priceCallOption) elements.priceCallOption.checked = true;
+  updateColorFilterOptions();
+  updateConditionalFilters();
+  syncQuickSearch('');
+  syncHeaderSearch('');
+  applyFilters();
+}
+
+function toggleExpandedCard(id) {
+  state.expandedId = state.expandedId === id ? null : id;
+  renderProducts();
+}
+
+function openLightbox(src, alt) {
+  if (!elements.lightboxModal || !elements.lightboxImage) return;
+  elements.lightboxImage.src = src;
+  elements.lightboxImage.alt = alt;
+  openModal(elements.lightboxModal);
+}
+
+function openModal(modal) {
+  if (!modal) return;
+  modal.classList.remove('hidden');
+}
+
+function closeModal(modal) {
+  if (!modal) return;
+  modal.classList.add('hidden');
+}
+
+function showComingSoon(message) {
+  if (!elements.comingSoonModal) return;
+  const text = elements.comingSoonModal.querySelector('p');
+  if (text) text.textContent = message;
+  openModal(elements.comingSoonModal);
+}
+
+function withOptionalSwatch(color) {
+  if (!color) return '—';
+  const swatchColor = colorToHex(color);
+  if (!swatchColor) return color;
+  return `${color} <span class="color-swatch" style="background:${swatchColor}"></span>`;
+}
+
+function colorToHex(color) {
+  const map = {
+    D: '#f8f9fa',
+    E: '#f1f5f9',
+    F: '#e2e8f0',
+    G: '#e0f2fe',
+    H: '#fef3c7',
+    I: '#fde68a',
+    J: '#fcd34d',
+    'Deep Green': '#065f46',
+    'Vivid Pink': '#be123c',
+    'Royal Blue': '#1d4ed8',
+    Purple: '#6d28d9',
+    Orange: '#ea580c',
+    Teal: '#0f766e',
+    Violet: '#7c3aed',
+    Padparadscha: '#fb7185',
+    Yellow: '#facc15',
+  };
+  return map[color] || null;
+}
+
+function statusKey(status) {
+  switch (status) {
+    case 'Available':
+      return 'available';
+    case 'On Hold':
+      return 'hold';
+    case 'Sold':
+      return 'sold';
+    default:
+      return 'available';
+  }
+}
+
+function statusDescription(status) {
+  switch (status) {
+    case 'Available':
+      return '✓ Available for Purchase';
+    case 'On Hold':
+      return '⏳ Currently On Hold';
+    case 'Sold':
+      return '✕ Sold - Archive';
+    default:
+      return status;
+  }
+}
+
+function availabilityMessage(status) {
+  switch (status) {
+    case 'Available':
+      return 'Available for private viewing';
+    case 'On Hold':
+      return 'Reserved - join priority list';
+    case 'Sold':
+      return 'Archived for provenance';
+    default:
+      return 'By appointment only';
+  }
+}
+
+function formatPrice(value) {
+  if (value === null || value === undefined || value === Infinity) return 'Call For Price';
+  return value.toLocaleString('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+  });
+}
+
+function getEmbedUrl(url) {
+  const youtubeMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]+)/);
+  if (youtubeMatch) {
+    return { type: 'iframe', url: `https://www.youtube.com/embed/${youtubeMatch[1]}` };
+  }
+  const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
+  if (vimeoMatch) {
+    return { type: 'iframe', url: `https://player.vimeo.com/video/${vimeoMatch[1]}` };
+  }
+  const extension = url.split('.').pop().toLowerCase();
+  const mime = extension === 'webm' ? 'video/webm' : 'video/mp4';
+  return { type: 'video', url, mime };
+}
+
+function scrollIntoView(element) {
+  const rect = element.getBoundingClientRect();
+  const absoluteElementTop = rect.top + window.scrollY;
+  const offset = 120;
+  window.scrollTo({ top: absoluteElementTop - offset, behavior: 'smooth' });
+}
+
+function toggleClearButton(button, value) {
+  if (!button) return;
+  if (value) button.classList.add('active');
+  else button.classList.remove('active');
+}
+
+function syncQuickSearch(value) {
+  if (elements.quickSearch) {
+    elements.quickSearch.value = value;
+    toggleClearButton(elements.quickSearchClear, value);
+  }
+}
+
+function syncHeaderSearch(value) {
+  if (elements.headerSearch) {
+    elements.headerSearch.value = value;
+    toggleClearButton(elements.headerSearchClear, value);
+  }
+}
+
+function debounce(fn, delay) {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn(...args), delay);
+  };
+}
+

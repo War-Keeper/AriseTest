@@ -1,262 +1,376 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Gem Catalog • Static + Google Sheets</title>
-  <link rel="icon" href="data:,"><!-- silence favicon 404 -->
-
-  <!-- Tailwind (CDN is fine for GitHub Pages) -->
-  <script src="https://cdn.tailwindcss.com"></script>
-
-  <style>
-    /* Scrollbar */
-    ::-webkit-scrollbar { width: 10px; height: 10px; }
-    ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 8px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-
-    /* Skeleton shimmer */
-    .skeleton { position: relative; overflow: hidden; background-color: #e5e7eb; }
-    .skeleton::after { content: ""; position: absolute; inset: 0;
-      background: linear-gradient(90deg, rgba(229,231,235,0), rgba(229,231,235,.8), rgba(229,231,235,0));
-      animation: shimmer 1.3s infinite; transform: translateX(-100%); }
-    @keyframes shimmer { 100% { transform: translateX(100%); } }
-
-    /* Inputs/selects outline */
-    .form-field { border-width: 2px; border-color: #cbd5e1; }
-    .form-field:focus { outline: 2px solid transparent; border-color:#4f46e5; box-shadow: 0 0 0 3px rgba(99,102,241,.35); }
-
-    /* Color swatch dot */
-    .swatch { width: 16px; height: 16px; border-radius: 9999px; box-shadow: inset 0 0 0 2px rgba(255,255,255,.7); }
-
-    /* Cards */
-    .card { transition: all .2s ease; }
-    .card:hover { box-shadow: 0 8px 24px rgba(17,24,39,.08); transform: translateY(-2px); }
-
-    /* Filter buttons/chips */
-    .filter-btn, .filter-chip {
-      border: 2px solid #e5e7eb; background:#fff; color:#111827;
-      padding: .25rem .5rem; border-radius: .5rem; font-size: .75rem;
-    }
-    .filter-btn:hover, .filter-chip:hover { background:#f8fafc; border-color:#cbd5e1; }
-    .filter-btn.active, .filter-chip.active {
-      background:#4f46e5; color:#fff; border-color:#4f46e5;
-      box-shadow: 0 0 0 3px rgba(99,102,241,.25);
-    }
-
-    /* horizontal media strip */
-    .media-strip{display:flex;gap:.5rem;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
-    .media-strip::-webkit-scrollbar{height:8px}
-    .media-strip::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:8px}
-    .media-item{flex:0 0 100%;scroll-snap-align:center;border-radius:.75rem;overflow:hidden;background:#f3f4f6}
-    .media-item > img,.media-item > video{width:100%;height:100%;object-fit:cover;display:block}
-  </style>
-</head>
-<body class="bg-gray-50 text-gray-900">
-  <!-- Header -->
-  <header class="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-gray-200">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-4">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-indigo-600"></div>
-        <div>
-          <h1 class="text-lg font-semibold">Gem Catalog</h1>
-          <p class="text-xs text-gray-500">Static site • Google Sheet powered</p>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Arise Precious Gems luxury gemstone and diamond inventory catalog." />
+    <title>Arise Precious Gems | Luxury Gemstone Inventory</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><text y='32' font-size='32'>💎</text></svg>" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="header-left">
+        <button class="menu-toggle" aria-label="Toggle filters">
+          <span class="menu-icon"></span>
+        </button>
+        <div class="logo" aria-label="Arise Precious Gems">
+          <span class="logo-icon" aria-hidden="true">💎</span>
+          <span class="logo-text">ARISE PRECIOUS GEMS</span>
         </div>
       </div>
-
-      <div class="ml-auto flex-1 max-w-2xl">
-        <label class="sr-only" for="q">Search</label>
-        <div class="relative">
-          <input id="q" type="search" placeholder="Search stock ID, shape, origin, etc…" class="form-field w-full rounded-xl pl-10" />
-          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-            <svg width="16" height="16"><use href="#"></use></svg>
-          </div>
+      <div class="header-center">
+        <div class="search-bar">
+          <span class="search-icon" aria-hidden="true">🔍</span>
+          <input type="search" id="headerSearch" placeholder="Search the collection" autocomplete="off" />
+          <button class="clear-search" type="button" aria-label="Clear search">&times;</button>
         </div>
       </div>
-
-      <div class="flex items-center gap-2">
-        <button id="refreshBtn" class="rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50 hidden sm:inline-flex items-center gap-2">Refresh</button>
-        <a id="csvLink" href="#" class="rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50">Data</a>
+      <div class="header-right">
+        <button class="btn ghost" id="uploadCsvBtn" type="button">
+          <span class="icon" aria-hidden="true">📤</span>
+          Upload CSV
+        </button>
+        <button class="icon-button" type="button" aria-label="View cart">
+          <span aria-hidden="true">🛒</span>
+        </button>
+        <button class="icon-button" type="button" aria-label="Account">
+          <span aria-hidden="true">👤</span>
+        </button>
       </div>
-    </div>
-  </header>
+    </header>
 
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-    <!-- Sidebar Filters (desktop) - NO Gem Type here -->
-    <aside class="hidden lg:block lg:col-span-3">
-      <div class="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 sticky top-24">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-sm font-semibold">Filters</h2>
-          <button id="clearAll" class="text-xs text-indigo-600 hover:underline">Clear all</button>
-        </div>
-        <div id="activePills" class="flex flex-wrap gap-2 mb-3"></div>
-        <div id="facets" class="space-y-4"></div>
-      </div>
-    </aside>
-
-    <!-- Results + Toolbar -->
-    <section class="lg:col-span-9">
-      <div class="bg-white rounded-2xl border border-gray-200 p-3 sm:p-4">
-        <!-- Top toolbar -->
-        <div id="toolbar" class="mb-4 space-y-4">
-          <div>
-            <div class="text-[12px] font-medium mb-2">Gem Type</div>
-            <!-- Hidden on mobile; desktop quick chips -->
-            <div id="chipStones" class="hidden md:flex flex-wrap gap-2"></div>
-          </div>
-          <div>
-            <div class="text-[12px] font-medium mb-2">Shape</div>
-            <div id="chipShapes" class="flex flex-wrap gap-2"></div>
-          </div>
-          <div class="grid md:grid-cols-3 gap-4">
-            <div>
-              <div class="text-[12px] font-medium">Price (USD)</div>
-              <div class="flex items-center gap-2 mt-2">
-                <input id="priceMin" type="number" class="form-field w-28 rounded text-sm" placeholder="$ Min">
-                <input id="priceMax" type="number" class="form-field w-32 rounded text-sm" placeholder="$ Max">
+    <main class="app-layout">
+      <aside class="filter-panel" aria-label="Refine search panel">
+        <div class="filter-panel-inner">
+          <header class="filter-header">
+            <div class="filter-title">
+              <span class="filter-icon" aria-hidden="true">🔍</span>
+              <div>
+                <h2>Refine Search</h2>
+                <p><span id="filterResultCount">0</span> results</p>
               </div>
             </div>
-            <div>
-              <div class="text-[12px] font-medium">Carat</div>
-              <div class="flex items-center gap-2 mt-2">
-                <input id="caratMin" type="number" step="0.01" class="form-field w-24 rounded text-sm" placeholder="Min">
-                <input id="caratMax" type="number" step="0.01" class="form-field w-24 rounded text-sm" placeholder="Max">
-              </div>
-            </div>
-            <div>
-              <div class="text-[12px] font-medium">Quality Grade</div>
-              <div class="flex items-center gap-2 mt-2">
-                <select id="qualityMin" class="form-field rounded text-sm">
-                  <option value="1">A</option><option value="2">AA</option><option value="3">AAA</option><option value="4">AAAA</option><option value="5">AAAAA</option>
-                </select>
-                <span class="text-gray-400">to</span>
-                <select id="qualityMax" class="form-field rounded text-sm">
-                  <option value="1">A</option><option value="2">AA</option><option value="3" selected>AAA</option><option value="4">AAAA</option><option value="5">AAAAA</option>
-                </select>
-              </div>
-            </div>
-          </div>
+            <button class="btn-text" id="closeFilters" type="button">Close</button>
+          </header>
 
-          <div class="grid md:grid-cols-5 gap-2">
-            <select id="selOrigin" class="form-field rounded text-sm"><option value="">Origin</option></select>
-            <select id="selPair" class="form-field rounded text-sm"><option value="">Single/Pair</option><option>Single</option><option>Pair</option></select>
-            <select id="selClarity" class="form-field rounded text-sm"><option value="">Clarity</option></select>
-            <select id="selTreatment" class="form-field rounded text-sm"><option value="">Enhancement</option></select>
-            <select id="selCert" class="form-field rounded text-sm"><option value="">Certificate</option></select>
-          </div>
+          <section class="filter-section expanded" data-filter="quick-search">
+            <button class="filter-toggle" type="button" aria-expanded="true">
+              <span>Quick Search</span>
+              <span class="toggle-icon" aria-hidden="true"></span>
+            </button>
+            <div class="filter-content">
+              <div class="quick-search-input">
+                <input
+                  type="search"
+                  id="quickSearch"
+                  placeholder="Search by stock #, color, shape..."
+                  autocomplete="off"
+                />
+                <button class="clear-search" type="button" aria-label="Clear quick search">&times;</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="filter-section" data-filter="status">
+            <button class="filter-toggle" type="button" aria-expanded="false">
+              <span>Availability Status</span>
+              <span class="toggle-icon" aria-hidden="true"></span>
+            </button>
+            <div class="filter-content" hidden>
+              <div class="filter-options radio-group">
+                <label>
+                  <input type="radio" name="status" value="all" checked />
+                  All Items <span class="count" data-count="status-all">0</span>
+                </label>
+                <label>
+                  <input type="radio" name="status" value="Available" />
+                  Available Only <span class="count" data-count="status-available">0</span>
+                </label>
+                <label>
+                  <input type="radio" name="status" value="On Hold" />
+                  On Hold Only <span class="count" data-count="status-hold">0</span>
+                </label>
+                <label>
+                  <input type="radio" name="status" value="Sold" />
+                  Sold (Archive) <span class="count" data-count="status-sold">0</span>
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <section class="filter-section" data-filter="type">
+            <button class="filter-toggle" type="button" aria-expanded="false">
+              <span>Stone Type</span>
+              <span class="toggle-icon" aria-hidden="true"></span>
+            </button>
+            <div class="filter-content" hidden>
+              <div class="filter-actions">
+                <button class="btn-text" data-action="select-all" type="button">Select All</button>
+                <button class="btn-text" data-action="deselect-all" type="button">Deselect All</button>
+              </div>
+              <div class="filter-options" id="typeFilterOptions">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+          </section>
+
+          <section class="filter-section" data-filter="shape">
+            <button class="filter-toggle" type="button" aria-expanded="false">
+              <span>Shape</span>
+              <span class="toggle-icon" aria-hidden="true"></span>
+            </button>
+            <div class="filter-content" hidden>
+              <div class="shape-grid" id="shapeFilterOptions">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+          </section>
+
+          <section class="filter-section" data-filter="carat">
+            <button class="filter-toggle" type="button" aria-expanded="false">
+              <span>Carat Weight</span>
+              <span class="toggle-icon" aria-hidden="true"></span>
+            </button>
+            <div class="filter-content" hidden>
+              <div class="range-inputs">
+                <div class="range-field">
+                  <label for="caratMin">Min</label>
+                  <input type="number" id="caratMin" step="0.01" min="0" value="0.5" />
+                </div>
+                <div class="range-field">
+                  <label for="caratMax">Max</label>
+                  <input type="number" id="caratMax" step="0.01" min="0" value="10" />
+                </div>
+              </div>
+              <div class="dual-range">
+                <input type="range" id="caratRangeMin" min="0.5" max="10" step="0.01" value="0.5" />
+                <input type="range" id="caratRangeMax" min="0.5" max="10" step="0.01" value="10" />
+              </div>
+              <div class="preset-options" id="caratPresets">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+          </section>
+
+          <section class="filter-section" data-filter="color">
+            <button class="filter-toggle" type="button" aria-expanded="false">
+              <span>Color</span>
+              <span class="toggle-icon" aria-hidden="true"></span>
+            </button>
+            <div class="filter-content" hidden>
+              <div class="filter-options" id="colorFilterOptions">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+          </section>
+
+          <section class="filter-section" data-filter="clarity">
+            <button class="filter-toggle" type="button" aria-expanded="false">
+              <span>Clarity</span>
+              <span class="toggle-icon" aria-hidden="true"></span>
+            </button>
+            <div class="filter-content" hidden>
+              <div class="filter-options" id="clarityFilterOptions">
+                <!-- Populated by JS -->
+              </div>
+              <p class="helper-text">Hover to learn more about clarity grades.</p>
+            </div>
+          </section>
+
+          <section class="filter-section" data-filter="cut">
+            <button class="filter-toggle" type="button" aria-expanded="false">
+              <span>Cut Quality</span>
+              <span class="toggle-icon" aria-hidden="true"></span>
+            </button>
+            <div class="filter-content" hidden>
+              <div class="filter-options" id="cutFilterOptions">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+          </section>
+
+          <section class="filter-section" data-filter="lab">
+            <button class="filter-toggle" type="button" aria-expanded="false">
+              <span>Certification Lab</span>
+              <span class="toggle-icon" aria-hidden="true"></span>
+            </button>
+            <div class="filter-content" hidden>
+              <div class="filter-options lab-options" id="labFilterOptions">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+          </section>
+
+          <section class="filter-section" data-filter="price">
+            <button class="filter-toggle" type="button" aria-expanded="false">
+              <span>Total Price</span>
+              <span class="toggle-icon" aria-hidden="true"></span>
+            </button>
+            <div class="filter-content" hidden>
+              <div class="range-inputs">
+                <div class="range-field">
+                  <label for="priceMin">Min</label>
+                  <input type="number" id="priceMin" min="0" step="100" value="0" />
+                </div>
+                <div class="range-field">
+                  <label for="priceMax">Max</label>
+                  <input type="number" id="priceMax" min="0" step="100" value="20000" />
+                </div>
+              </div>
+              <div class="dual-range">
+                <input type="range" id="priceRangeMin" min="0" max="20000" step="100" value="0" />
+                <input type="range" id="priceRangeMax" min="0" max="20000" step="100" value="20000" />
+              </div>
+              <div class="preset-options" id="pricePresets">
+                <!-- Populated by JS -->
+              </div>
+              <label class="call-price-option">
+                <input type="checkbox" id="priceCallOption" checked />
+                Include “Call For Price” items
+              </label>
+            </div>
+          </section>
+
+          <section class="filter-section" data-filter="treatment">
+            <button class="filter-toggle" type="button" aria-expanded="false">
+              <span>Treatment Type</span>
+              <span class="toggle-icon" aria-hidden="true"></span>
+            </button>
+            <div class="filter-content" hidden>
+              <div class="info-line">
+                <span class="info-icon" aria-hidden="true">ⓘ</span>
+                Treatments affect value and durability.
+                <button class="btn-text" type="button" id="learnTreatments">Learn More</button>
+              </div>
+              <div class="filter-options" id="treatmentFilterOptions">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+          </section>
+
+          <section class="filter-section" data-filter="growth">
+            <button class="filter-toggle" type="button" aria-expanded="false">
+              <span>Growth Type</span>
+              <span class="toggle-icon" aria-hidden="true"></span>
+            </button>
+            <div class="filter-content" hidden>
+              <div class="filter-options radio-group" id="growthFilterOptions">
+                <label>
+                  <input type="radio" name="growth" value="all" checked />
+                  All Diamonds
+                </label>
+                <label>
+                  <input type="radio" name="growth" value="natural" />
+                  Natural Only
+                </label>
+                <label>
+                  <input type="radio" name="growth" value="lab" />
+                  Lab-Grown Only (CVD / HPHT)
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <section class="filter-section" data-filter="origin">
+            <button class="filter-toggle" type="button" aria-expanded="false">
+              <span>Origin</span>
+              <span class="toggle-icon" aria-hidden="true"></span>
+            </button>
+            <div class="filter-content" hidden>
+              <div class="filter-options" id="originFilterOptions">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+          </section>
+
+          <footer class="filter-footer">
+            <div class="active-filter-count">
+              Active Filters: <span id="activeFilterCount">0</span>
+            </div>
+            <button class="btn-outline" id="clearAllFilters" type="button">Clear All Filters</button>
+            <p class="results-indicator">Showing <span id="visibleCount">0</span> of <span id="totalCount">0</span> items</p>
+          </footer>
         </div>
+      </aside>
 
-        <div class="flex flex-wrap items-center gap-3 mb-3">
-          <div class="text-sm text-gray-500"><span id="resultCount">0</span> results</div>
-          <div class="ml-auto flex items-center gap-2">
-            <label class="text-xs text-gray-500" for="sort">Sort</label>
-            <select id="sort" class="form-field rounded-lg text-sm">
-              <option value="featured">Featured</option>
-              <option value="priceAsc">Price/Ct ↑</option>
-              <option value="priceDesc">Price/Ct ↓</option>
-              <option value="caratAsc">Carat ↑</option>
-              <option value="caratDesc">Carat ↓</option>
-              <option value="newest">Newest</option>
+      <section class="inventory-area">
+        <div class="results-bar">
+          <div class="results-info">
+            <p class="results-count">
+              Showing <span id="resultsVisible">0</span> of <span id="resultsTotal">0</span> items
+            </p>
+            <div class="active-chips" id="activeFilterChips"></div>
+          </div>
+          <div class="results-actions">
+            <label for="sortBy" class="sort-label">Sort:</label>
+            <select id="sortBy" aria-label="Sort inventory">
+              <option value="recent">Recently Added</option>
+              <option value="price-asc">Price: Low to High</option>
+              <option value="price-desc">Price: High to Low</option>
+              <option value="carat-desc">Carat: Largest First</option>
+              <option value="carat-asc">Carat: Smallest First</option>
+              <option value="stock-asc">Stock Number</option>
             </select>
-            <label class="text-xs text-gray-500" for="perPage">Per page</label>
-            <select id="perPage" class="form-field rounded-lg text-sm">
-              <option>24</option><option>48</option><option>96</option>
-            </select>
+            <div class="view-toggle" role="group" aria-label="Toggle layout view">
+              <button class="toggle-btn active" data-view="grid" type="button" aria-pressed="true">⊞</button>
+              <button class="toggle-btn" data-view="list" type="button" aria-pressed="false">☰</button>
+            </div>
           </div>
         </div>
 
-        <div id="grid" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+        <div class="product-grid" id="productGrid" aria-live="polite"></div>
+      </section>
+    </main>
 
-        <div class="flex items-center justify-center gap-2 mt-4">
-          <button id="prevPage" class="px-3 py-2 text-sm rounded-lg border border-gray-300 disabled:opacity-50">Prev</button>
-          <div class="text-sm text-gray-500">Page <span id="page">1</span> / <span id="pages">1</span></div>
-          <button id="nextPage" class="px-3 py-2 text-sm rounded-lg border border-gray-300 disabled:opacity-50">Next</button>
+    <div class="modal hidden" id="lightboxModal" role="dialog" aria-modal="true" aria-labelledby="lightboxTitle">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content lightbox">
+        <button class="modal-close" type="button" aria-label="Close image" data-close-modal>&times;</button>
+        <div class="lightbox-body">
+          <img src="" alt="Expanded gemstone view" id="lightboxImage" />
         </div>
-      </div>
-    </section>
-  </main>
-
-  <!-- Mobile bottom bar -->
-  <div class="fixed bottom-0 inset-x-0 z-40 sm:hidden">
-    <div class="mx-auto max-w-7xl px-4 pb-4">
-      <div class="bg-white/95 backdrop-blur shadow border rounded-2xl p-2 flex items-center justify-center gap-3">
-        <button id="mobileFiltersBtn" class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-gray-300 bg-white text-sm">Filters</button>
       </div>
     </div>
-  </div>
 
-  <!-- Mobile bottom sheet -->
-  <div id="mobileSheet" class="fixed inset-0 z-50 hidden" aria-modal="true" role="dialog">
-    <div class="absolute inset-0 bg-black/40" data-close></div>
-    <div class="absolute inset-x-0 bottom-0 bg-white rounded-t-2xl shadow-xl max-h-[85vh] flex flex-col">
-      <div class="relative p-4 border-b">
-        <div class="absolute left-1/2 -translate-x-1/2 -top-3 h-1.5 w-12 bg-gray-300 rounded-full"></div>
-        <div class="flex items-center justify-between">
-          <h3 class="font-semibold">Filters</h3>
-          <button id="mobileClose" class="text-gray-500">Close</button>
-        </div>
-      </div>
-      <div class="overflow-y-auto p-4 space-y-4" id="facetsMobile"></div>
-      <div class="p-4 border-t flex gap-2">
-        <button id="mobileClear" class="px-3 py-2 rounded-lg border border-gray-300">Clear</button>
-        <button id="mobileApply" class="flex-1 px-3 py-2 rounded-lg bg-indigo-600 text-white">Apply</button>
+    <div class="modal hidden" id="comingSoonModal" role="dialog" aria-modal="true" aria-labelledby="comingSoonTitle">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <button class="modal-close" type="button" aria-label="Close dialog" data-close-modal>&times;</button>
+        <h3 id="comingSoonTitle">Feature coming soon</h3>
+        <p>This premium experience is nearly ready. Please check back shortly.</p>
+        <button class="btn" type="button" data-close-modal>Close</button>
       </div>
     </div>
-  </div>
 
-  <!-- Card template -->
-  <template id="cardTpl">
-    <article class="card group bg-white rounded-xl border border-gray-200 overflow-hidden" data-card>
-      <div class="aspect-square bg-gray-100 relative">
-        <img class="w-full h-full object-cover" alt="Gem image" />
-        <div class="absolute top-2 right-2 flex gap-1">
-          <span class="px-1.5 py-0.5 text-[10px] rounded-full bg-white/90 border border-gray-200" data-badge="stone"></span>
-          <span class="px-1.5 py-0.5 text-[10px] rounded-full bg-white/90 border border-gray-200 flex items-center gap-1" data-badge="color">
-            <span class="swatch"></span><span data-badge-label></span>
-          </span>
-        </div>
-      </div>
-      <div class="p-3 space-y-1">
-        <div class="flex items-start justify-between gap-2">
-          <h3 class="font-medium text-sm leading-tight">
-            <a class="hover:underline" target="_blank" data-stock></a>
-          </h3>
-          <div class="text-right text-sm">
-            <div class="font-semibold" data-retail></div>
-            <div class="text-[11px] text-gray-500" data-carat></div>
-          </div>
-        </div>
-        <div class="text-xs text-gray-600 flex flex-wrap gap-x-3 gap-y-1">
-          <div><span class="text-gray-400">Shape:</span> <span data-shape></span></div>
-          <div><span class="text-gray-400">Clarity:</span> <span data-clarity></span></div>
-          <div><span class="text-gray-400">Origin:</span> <span data-origin></span></div>
-        </div>
-        <div class="text-[11px] text-gray-500"><span data-size></span></div>
-
-        <button type="button" class="mt-2 text-xs text-indigo-600 hover:underline" data-toggle>Details</button>
-        <div class="details hidden border-t border-gray-100 mt-2 pt-3 space-y-3" data-details>
-          <div class="media-strip" data-media></div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-gray-700" data-specs></div>
-        </div>
-      </div>
-    </article>
-  </template>
-
-  <!-- Skeleton template -->
-  <template id="skeletonTpl">
-    <div class="card bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div class="aspect-square skeleton"></div>
-      <div class="p-3 space-y-2">
-        <div class="h-4 rounded skeleton"></div>
-        <div class="h-3 w-2/3 rounded skeleton"></div>
-        <div class="h-3 w-1/2 rounded skeleton"></div>
+    <div class="modal hidden" id="treatmentModal" role="dialog" aria-modal="true" aria-labelledby="treatmentTitle">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <button class="modal-close" type="button" aria-label="Close dialog" data-close-modal>&times;</button>
+        <h3 id="treatmentTitle">Understanding Treatments</h3>
+        <p>
+          Treatments can enhance the appearance and durability of gemstones. We disclose every treatment type to help you
+          make an informed decision about your investment.
+        </p>
+        <ul>
+          <li><strong>None:</strong> Natural stones with no treatments applied.</li>
+          <li><strong>Heat / No Heat:</strong> Thermal processes affecting color or clarity.</li>
+          <li><strong>Minor Oil:</strong> Light oiling often used with emeralds to reduce visible inclusions.</li>
+          <li><strong>Diffusion:</strong> Surface-level color enhancements.</li>
+          <li><strong>Fracture Filled:</strong> Filling fractures with resin or glass to improve appearance.</li>
+        </ul>
+        <button class="btn" type="button" data-close-modal>Close</button>
       </div>
     </div>
-  </template>
 
-  <!-- Libs + App -->
-  <script src="https://unpkg.com/feather-icons"></script>
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <script src="app.js"></script>
-</body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" defer></script>
+    <script src="app.js" defer></script>
+  </body>
 </html>
+
